@@ -1,7 +1,8 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { ChatMessage, ChatResult, LlmProvider } from '../llm.types';
+import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
+import { ChatMessage, ChatResult, LlmProvider, StructuredChatResult } from '../llm.types';
+import { DOCUMENT_METADATA_SYSTEM_PROMPT } from '../schemas/document-metadata.schema';
 
 @Injectable()
 export class GeminiProvider implements LlmProvider {
@@ -65,6 +66,89 @@ export class GeminiProvider implements LlmProvider {
 
       return {
         reply,
+        model: this.chatModel,
+        provider: this.name,
+        usage: {
+          promptTokens: usage?.promptTokenCount ?? 0,
+          completionTokens: usage?.candidatesTokenCount ?? 0,
+          totalTokens: usage?.totalTokenCount ?? 0,
+        },
+      };
+    } catch (error) {
+      if (error instanceof ServiceUnavailableException) {
+        throw error;
+      }
+
+      const message =
+        error instanceof Error ? error.message : 'Unknown Gemini error';
+
+      throw new ServiceUnavailableException(`Gemini error: ${message}`);
+    }
+  }
+
+  async chatStructured(messages: ChatMessage[]): Promise<StructuredChatResult> {
+    try {
+      const systemInstruction =
+        messages
+          .filter((message) => message.role === 'system')
+          .map((message) => message.content)
+          .join('\n') || DOCUMENT_METADATA_SYSTEM_PROMPT;
+
+      const userMessage = [...messages]
+        .reverse()
+        .find((message) => message.role === 'user')?.content;
+
+      if (!userMessage) {
+        throw new ServiceUnavailableException('A user message is required');
+      }
+
+      const model = this.getClient().getGenerativeModel({
+        model: this.chatModel,
+        systemInstruction,
+        generationConfig: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: SchemaType.OBJECT,
+            properties: {
+              title: { type: SchemaType.STRING },
+              language: { type: SchemaType.STRING },
+              documentType: {
+                type: SchemaType.STRING,
+                format: 'enum',
+                enum: ['policy', 'faq', 'contract', 'guide', 'other'],
+              },
+              tags: {
+                type: SchemaType.ARRAY,
+                items: { type: SchemaType.STRING },
+              },
+              indexable: { type: SchemaType.BOOLEAN },
+              confidence: { type: SchemaType.NUMBER },
+            },
+            required: [
+              'title',
+              'language',
+              'documentType',
+              'tags',
+              'indexable',
+              'confidence',
+            ],
+          },
+        },
+      });
+
+      const result = await model.generateContent(userMessage);
+      const content = result.response.text();
+
+      if (!content) {
+        throw new ServiceUnavailableException(
+          'Gemini returned an empty structured response',
+        );
+      }
+
+      const usage = result.response.usageMetadata;
+
+      return {
+        content,
         model: this.chatModel,
         provider: this.name,
         usage: {

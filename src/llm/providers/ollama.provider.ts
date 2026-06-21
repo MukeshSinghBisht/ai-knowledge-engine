@@ -1,7 +1,11 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
-import { ChatMessage, ChatResult, LlmProvider } from '../llm.types';
+import { ChatMessage, ChatResult, LlmProvider, StructuredChatResult } from '../llm.types';
+import {
+  DOCUMENT_METADATA_JSON_SCHEMA,
+  DOCUMENT_METADATA_SYSTEM_PROMPT,
+} from '../schemas/document-metadata.schema';
 
 @Injectable()
 export class OllamaProvider implements LlmProvider {
@@ -52,6 +56,65 @@ export class OllamaProvider implements LlmProvider {
 
       return {
         reply,
+        model: response.model ?? this.chatModel,
+        provider: this.name,
+        usage: {
+          promptTokens: response.usage?.prompt_tokens ?? 0,
+          completionTokens: response.usage?.completion_tokens ?? 0,
+          totalTokens: response.usage?.total_tokens ?? 0,
+        },
+      };
+    } catch (error) {
+      if (error instanceof ServiceUnavailableException) {
+        throw error;
+      }
+
+      if (error instanceof OpenAI.APIError) {
+        const hint =
+          error.status === undefined || error.status >= 500
+            ? ' Is Ollama running? Try: ollama serve'
+            : '';
+
+        throw new ServiceUnavailableException(
+          `Ollama error: ${error.message}.${hint}`,
+        );
+      }
+
+      const message =
+        error instanceof Error ? error.message : 'Unknown Ollama error';
+
+      throw new ServiceUnavailableException(
+        `Ollama error: ${message}. Is Ollama running at ${this.baseUrl}?`,
+      );
+    }
+  }
+
+  async chatStructured(messages: ChatMessage[]): Promise<StructuredChatResult> {
+    const structuredMessages: ChatMessage[] = [
+      {
+        role: 'system',
+        content: `${DOCUMENT_METADATA_SYSTEM_PROMPT}\n\nRespond with JSON matching this schema:\n${JSON.stringify(DOCUMENT_METADATA_JSON_SCHEMA)}`,
+      },
+      ...messages.filter((message) => message.role !== 'system'),
+    ];
+
+    try {
+      const response = await this.getClient().chat.completions.create({
+        model: this.chatModel,
+        messages: structuredMessages,
+        response_format: { type: 'json_object' },
+      });
+
+      const content = response.choices[0]?.message?.content;
+
+      if (!content) {
+        throw new ServiceUnavailableException(
+          'Ollama returned an empty structured response',
+        );
+      }
+
+      return {
+        content,
         model: response.model ?? this.chatModel,
         provider: this.name,
         usage: {

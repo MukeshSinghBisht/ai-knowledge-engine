@@ -33,3 +33,15 @@ Add 5–10 bullet answers here after each study session (30 min/day).
 - **Prompt tokens:** system message + user message (input).
 - **Completion tokens:** the `reply` field only (output).
 - **Total:** both added together.
+- Context window = shared budget (input + output)
+- Embeddings = meaning-based search, not keyword match
+- Your flow: `Controller → ChatService → LlmService → Provider`
+- System prompt is server-side in `ChatService`, not from client
+- Extra DTO fields → 400 via `forbidNonWhitelisted`
+- All providers return `ChatResult` so the API stays provider-agnostic
+
+- Structured output = LLM as a **step in a pipeline**, not only a chat widget
+- Use when downstream code needs **fields**, not paragraphs
+- Always **validate output**; use confidence thresholds for automation
+- In my project: metadata at ingest, optional query planning before RAG, safety before index
+

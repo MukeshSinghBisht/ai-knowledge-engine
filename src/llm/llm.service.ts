@@ -1,6 +1,6 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ChatMessage, ChatResult, LlmProvider, LlmProviderName } from './llm.types';
+import { ChatMessage, ChatResult, LlmProvider, LlmProviderName, StructuredChatResult } from './llm.types';
 import { GeminiProvider } from './providers/gemini.provider';
 import { OllamaProvider } from './providers/ollama.provider';
 import { OpenAiProvider } from './providers/openai.provider';
@@ -35,6 +35,10 @@ export class LlmService {
 
   chat(messages: ChatMessage[]): Promise<ChatResult> {
     return this.getProvider().chat(messages);
+  }
+
+  chatStructured(messages: ChatMessage[]): Promise<StructuredChatResult> {
+    return this.getProvider().chatStructured(messages);
   }
 
   private getProvider(): LlmProvider {

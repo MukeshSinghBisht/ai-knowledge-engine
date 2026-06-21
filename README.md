@@ -104,11 +104,43 @@ curl -X POST http://localhost:3000/chat \
 }
 ```
 
+### Structured document metadata (Week 2)
+
+Extract validated metadata from raw document text — useful before chunking/embedding in later RAG phases.
+
+```bash
+curl -X POST http://localhost:3000/chat/structured \
+  -H "Content-Type: application/json" \
+  -d "{\"text\":\"Return Policy\\n\\nItems may be returned within 30 days of purchase with receipt.\"}"
+```
+
+**Response:**
+
+```json
+{
+  "metadata": {
+    "title": "Return Policy",
+    "language": "en",
+    "documentType": "policy",
+    "tags": ["returns", "refund", "receipt"],
+    "indexable": true,
+    "confidence": 0.92
+  },
+  "model": "llama3.2",
+  "provider": "ollama",
+  "usage": {
+    "promptTokens": 120,
+    "completionTokens": 80,
+    "totalTokens": 200
+  }
+}
+```
+
 ## Project structure
 
 ```text
 src/
-  chat/       POST /chat
+  chat/       POST /chat, POST /chat/structured
   health/     GET /health
   llm/        Ollama + Gemini + OpenAI providers
 docs/
