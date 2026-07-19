@@ -83,3 +83,18 @@ Add 5–10 bullet answers here after each study session (30 min/day).
 - Schema created by `db/init.sql` (extension + tables + index), so `synchronize: false`.
 - Gotcha: a native Postgres already held port 5432 → ran the container on **5433**. Two Postgres on one port = silent wrong-DB connection.
 
+## RAG generation — `POST /query`
+
+- This is where retrieval + the LLM finally meet. The flow is **retrieve → augment → generate**:
+  1. **Retrieve** — embed the question and run the same top-k cosine search.
+  2. **Augment** — paste those chunks into the prompt as numbered `[Source n]` context ("context stuffing").
+  3. **Generate** — the LLM answers, and I return the answer **plus the source chunks** so it's traceable.
+- **Grounding** is the whole point: the system prompt says *answer using ONLY the context; if it's not there, say you don't know.* This is what stops the model from hallucinating outside the documents.
+- **Verified the guardrail:** asked "capital of France?" with only Acme docs stored → it correctly refused ("I don't know based on the available documents") instead of answering from general knowledge.
+- **Semantic proof again:** asked about the "guarantee" and it answered from a doc that only says "warranty" — retrieval matched by meaning, not keyword.
+- **`/query` vs `/chat`:** `/chat` is raw model knowledge; `/query` is answers restricted to *my* data. Same LLM, different trust boundary.
+- **`/query` vs `/search`:** search returns raw chunks (retrieval only); query turns them into a written answer + citations.
+- If retrieval returns nothing, I **skip the LLM call** entirely — no context means nothing to ground on.
+- Design: kept it in its own `query` module (answering) separate from `documents` (ingestion). `DocumentsModule` exports its service so query can reuse search.
+- Returned `usage` (token counts) too — RAG prompts are bigger because the context is stuffed in, so this is where cost/latency starts to matter.
+

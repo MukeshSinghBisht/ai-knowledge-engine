@@ -9,5 +9,6 @@ import { DocumentEntity } from './entities/document.entity';
   imports: [TypeOrmModule.forFeature([DocumentEntity, DocumentChunkEntity])],
   controllers: [DocumentsController],
   providers: [DocumentsService],
+  exports: [DocumentsService],
 })
 export class DocumentsModule {}

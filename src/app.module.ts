@@ -7,6 +7,7 @@ import { DocumentChunkEntity } from './documents/entities/document-chunk.entity'
 import { DocumentEntity } from './documents/entities/document.entity';
 import { HealthModule } from './health/health.module';
 import { LlmModule } from './llm/llm.module';
+import { QueryModule } from './query/query.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { LlmModule } from './llm/llm.module';
     HealthModule,
     ChatModule,
     DocumentsModule,
+    QueryModule,
   ],
 })
 export class AppModule {}

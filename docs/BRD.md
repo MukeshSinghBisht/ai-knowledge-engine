@@ -12,7 +12,7 @@
 | Project | AI Knowledge Engine (`ai-knowledge-engine`) |
 | Author | Mukesh Bisht |
 | Status | Living document — updated per phase |
-| Version | 0.3 (Phase 1 done + tool calling; Phase 2 Week 3 done: pgvector store + search) |
+| Version | 0.4 (Phase 1 + tool calling; Phase 2 store + search; Phase 3 core RAG `/query` done) |
 | Related | `ai-backend-engineer-roadmap/ROADMAP.md`, `ROADMAP` CHECKLIST, `docs/interview-notes.md` |
 
 **How to use this doc:** Before building a feature, open the matching requirement
@@ -175,10 +175,10 @@ Query:   question -> embed -> vector search top-k -> build context
 ### 7.5 RAG generation (Phase 3, Week 5–6)
 | ID | Priority | Requirement | Acceptance criteria |
 |----|----------|-------------|---------------------|
-| FR-GEN-01 | M | `POST /query` retrieves context then answers | Answer grounded only in retrieved chunks |
-| FR-GEN-02 | M | Answer includes source citations | `sources: [{ chunkId, score }]` |
-| FR-GEN-03 | M | "Don't know" behavior | If no relevant context, model says it doesn't know |
-| FR-GEN-04 | S | Log prompt, chunks used, latency | Minimal observability per query |
+| FR-GEN-01 | M | `POST /query` retrieves context then answers | **DONE.** Retrieves top-k (default 4), stuffs chunks into a grounded prompt, LLM answers. |
+| FR-GEN-02 | M | Answer includes source citations | **DONE.** Returns `sources[]` (chunkId, documentId, title, chunkIndex, content, score) + `grounded` flag. |
+| FR-GEN-03 | M | "Don't know" behavior | **DONE.** System prompt forbids outside knowledge; verified returns "I don't know based on the available documents." |
+| FR-GEN-04 | S | Log prompt, chunks used, latency | Pending — Phase 4 observability. |
 
 ### 7.6 Production engineering (Phase 4, Week 7–8)
 | ID | Priority | Requirement | Acceptance criteria |
@@ -288,7 +288,7 @@ Track ingestion job id, status, document reference, error, timestamps.
 | POST | `/chat/tools` | FR-TOOL-01 | 2 | Done (Ollama; others stubbed) |
 | POST | `/documents` | FR-ING-01..06 | 2–3 | Done (basic text; files/async in Wk4) |
 | POST | `/search` | FR-RAG-02..04 | 2 | Done (top-k cosine) |
-| POST | `/query` | FR-GEN-01..04 | 3 | Planned |
+| POST | `/query` | FR-GEN-01..04 | 3 | Done (grounded RAG answer + sources) |
 | GET | `/jobs/:id` | FR-JOB-03 | 4 | Planned |
 | POST | `/chat/stream` | FR-STR-01 | 5 | Planned |
 | POST | `/auth/register`, `/auth/login` | FR-AUTH-01 | 6 | Planned |
@@ -306,7 +306,7 @@ LLM output, `BadRequest` (400) for input validation.
 |-------|---------------|
 | 1 | Demo `curl` chat + structured metadata in README ✅ |
 | 2 | Semantic search returns top-k with scores (retrieval only) ✅ (Week 3; Week 4 adds files/async ingest) |
-| 3 | Upload doc → ask question → answer + sources |
+| 3 | Upload doc → ask question → answer + sources ✅ (core RAG via `/query`; file upload in Wk4) |
 | 4 | Async ingestion; API non-blocking on upload |
 | 5 | Live streaming RAG demo |
 | 6 | JWT multi-tenant isolation test passes; audit log present; portfolio-ready |

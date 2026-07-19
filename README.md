@@ -4,8 +4,9 @@ NestJS API with switchable **Ollama**, **Google Gemini**, or **OpenAI** provider
 
 - **Phase 1:** chat, structured output, tool/function calling
 - **Phase 2 (Week 3):** pgvector semantic search — store documents (chunk + embed) and search by meaning
+- **Phase 3 (core):** RAG `/query` — retrieve top-k chunks and answer grounded in them, with sources
 
-Later phases add full RAG answers, BullMQ ingestion, Redis caching, streaming, and multi-tenant auth.
+Later phases add file upload/async ingestion, Redis caching, streaming, and multi-tenant auth.
 
 See [docs/BRD.md](./docs/BRD.md) for the full phased requirements.
 
@@ -191,12 +192,40 @@ curl -X POST http://localhost:3000/search \
 }
 ```
 
+### Ask a question (RAG)
+
+Retrieves the top-k chunks and answers **using only those chunks**, returning the sources.
+
+```bash
+curl -X POST http://localhost:3000/query \
+  -H "Content-Type: application/json" \
+  -d "{\"query\":\"How long is the guarantee on Acme products?\"}"
+```
+
+**Response:**
+
+```json
+{
+  "answer": "All Acme Electronics products come with a 2-year limited warranty covering manufacturing defects.",
+  "grounded": true,
+  "sources": [
+    { "chunkId": "...", "title": "Acme Electronics Warranty", "score": 0.72, "content": "..." }
+  ],
+  "model": "llama3.2",
+  "provider": "ollama",
+  "usage": { "promptTokens": 485, "completionTokens": 29, "totalTokens": 514 }
+}
+```
+
+If nothing relevant is stored, it replies `"I don't know based on the available documents."` instead of guessing.
+
 ## Project structure
 
 ```text
 src/
   chat/       POST /chat, /chat/structured, /chat/tools
   documents/  POST /documents, /search (pgvector)
+  query/      POST /query (RAG: retrieve + generate)
   health/     GET /health
   llm/        Ollama + Gemini + OpenAI providers, tools/, embeddings
 db/
