@@ -7,8 +7,30 @@ export class DocumentStoredResponseDto {
   @ApiProperty({ example: 'Return Policy' })
   title: string;
 
+  @ApiProperty({
+    example: 'text',
+    enum: ['text', 'txt', 'pdf'],
+    description: 'Where the document came from',
+  })
+  sourceType: string;
+
   @ApiProperty({ example: 3, description: 'Number of chunks embedded and stored' })
   chunkCount: number;
+
+  @ApiProperty({
+    example: false,
+    description:
+      'True if identical content was already stored — nothing was re-ingested (idempotent).',
+  })
+  duplicate: boolean;
+}
+
+export class WipeResponseDto {
+  @ApiProperty({ example: 2, description: 'Documents deleted' })
+  deletedDocuments: number;
+
+  @ApiProperty({ example: 41, description: 'Chunks deleted' })
+  deletedChunks: number;
 }
 
 export class SearchResultDto {

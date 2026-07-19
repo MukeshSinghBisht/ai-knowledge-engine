@@ -4,9 +4,9 @@ NestJS API with switchable **Ollama**, **Google Gemini**, or **OpenAI** provider
 
 - **Phase 1:** chat, structured output, tool/function calling
 - **Phase 2 (Week 3):** pgvector semantic search — store documents (chunk + embed) and search by meaning
-- **Phase 3 (core):** RAG `/query` — retrieve top-k chunks and answer grounded in them, with sources
+- **Phase 3:** RAG `/query` (retrieve + answer grounded in sources) and file upload (`.txt`/`.pdf`) with duplicate detection
 
-Later phases add file upload/async ingestion, Redis caching, streaming, and multi-tenant auth.
+Later phases add async ingestion, Redis caching, streaming, and multi-tenant auth.
 
 See [docs/BRD.md](./docs/BRD.md) for the full phased requirements.
 
@@ -162,7 +162,21 @@ curl -X POST http://localhost:3000/documents \
   -d "{\"text\":\"Return Policy\\n\\nItems may be returned within 30 days of purchase with a valid receipt.\"}"
 ```
 
-**Response:** `{ "id": "...", "title": "Return Policy", "chunkCount": 1 }`
+**Response:** `{ "id": "...", "title": "Return Policy", "sourceType": "text", "chunkCount": 1, "duplicate": false }`
+
+Re-sending identical content is a no-op — the response comes back with `"duplicate": true` and nothing is re-embedded.
+
+### Upload a file (.txt or .pdf)
+
+Extracts the text, then ingests it exactly like `POST /documents` (max 10 MB).
+
+```bash
+curl -X POST http://localhost:3000/documents/upload \
+  -F "file=@./policy.pdf" \
+  -F "title=Return Policy"
+```
+
+**Response:** `{ "id": "...", "title": "Return Policy", "sourceType": "pdf", "chunkCount": 12, "duplicate": false }`
 
 ### Semantic search (Week 3)
 
@@ -224,12 +238,16 @@ If nothing relevant is stored, it replies `"I don't know based on the available 
 ```text
 src/
   chat/       POST /chat, /chat/structured, /chat/tools
-  documents/  POST /documents, /search (pgvector)
+  documents/  POST /documents, /documents/upload, /search, DELETE /documents
   query/      POST /query (RAG: retrieve + generate)
   health/     GET /health
   llm/        Ollama + Gemini + OpenAI providers, tools/, embeddings
 db/
   init.sql    pgvector extension + schema + HNSW index
+demo/
+  README.md               step-by-step demo runbook
+  ai-knowledge-engine-handbook.pdf   sample doc ("ask the AI about itself")
+  generate-handbook.js    regenerates the PDF
 docker-compose.yml   Postgres 16 + pgvector
 docs/
   BRD.md
@@ -237,6 +255,13 @@ docs/
   gemini-setup.md
   llm-provider-comparison.md
 ```
+
+## Demo
+
+See [demo/README.md](./demo/README.md) for a full 5-minute walkthrough: load the bundled
+handbook, ask the engine questions about itself (with cited sources), watch it refuse a
+question it has no data for, then upload another document and watch it answer instantly.
+Use `DELETE /documents` to reset between runs.
 
 ## Related
 

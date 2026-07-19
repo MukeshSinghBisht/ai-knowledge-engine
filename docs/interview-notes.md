@@ -98,3 +98,27 @@ Add 5–10 bullet answers here after each study session (30 min/day).
 - Design: kept it in its own `query` module (answering) separate from `documents` (ingestion). `DocumentsModule` exports its service so query can reuse search.
 - Returned `usage` (token counts) too — RAG prompts are bigger because the context is stuffed in, so this is where cost/latency starts to matter.
 
+## File ingestion — `POST /documents/upload`
+
+- Real docs come as **files**, so added multipart upload (`FileInterceptor`, 10 MB cap) alongside the raw-text endpoint.
+- **Extraction per type:** TXT = `buffer.toString('utf-8')`; PDF = `pdf-parse`. Everything downstream (chunk → embed → store) is identical, so both endpoints call one shared `ingest()` method.
+- **Validation:** unsupported type, empty file, or an image-only/scanned PDF (no extractable text) → `400` with a clear message. Scanned PDFs need OCR, which is out of scope.
+- **Idempotency (dedup):** store a `content_hash` = sha256 of the normalized text, with a **unique index**. Re-uploading the same content returns the existing doc as `duplicate: true` and **embeds nothing** — saves compute and avoids duplicate chunks polluting search. Also catch the unique-violation (23505) for the concurrent-upload race.
+- **pdf-parse gotcha:** v2 is a class-based rewrite with different (and untyped-for-me) API; pinned **v1.1.1** which is the simple `pdfParse(buffer) => { text }` function that matches `@types/pdf-parse`.
+- **Dev-server gotcha:** `nest start --watch` restarts on file changes and drops in-flight requests; for a long PDF ingest (125 chunks ≈ 1 min of embedding) I ran the built `node dist/main.js` instead so it wouldn't restart mid-request.
+- Schema change: added `source_type` (text/txt/pdf) + `content_hash` to `documents` via `init.sql`; since `init.sql` only runs on a fresh volume, I `docker compose down -v` to recreate.
+
+## RAG has two stages — and either can fail (real debugging story)
+
+- Asked "what embedding model + dimensions?" and the answer said *"the project uses **Ollama** with 768 dimensions"* — wrong: the model is **nomic-embed-text**; Ollama is only the **runtime** that serves it.
+- Debugged by hitting `/search` directly: the correct chunk ("uses the nomic-embed-text model... 768 dimensions") came back **ranked #1**. So **retrieval was perfect** — the bug was in **generation**.
+- Lesson to say out loud: **RAG = retrieval + generation, and they fail independently.** Always check *which* stage broke. Here a small model (`llama3.2`, ~3B) paraphrased a specific model name into the louder, repeated word "Ollama".
+- **Fix 1 (prompt):** told the model to use exact names/numbers verbatim and not substitute a general term for a specific one → went from 0/3 to ~2/3 correct. Cheap, helps, not a full fix.
+- **Fix 2 (model quality):** a bigger model (Gemini, or a larger local like `llama3.1:8b`) is the real fix — small models are the bottleneck for faithful synthesis, not the retrieval.
+- Config knobs: chat model = `OLLAMA_CHAT_MODEL`, provider = `LLM_PROVIDER` — swap without code changes.
+
+## Small ops touches
+
+- Added `DELETE /documents` to wipe all docs + chunks (`TRUNCATE`) — a one-click demo reset instead of `docker compose down -v`.
+- Built a demo runbook + a self-describing handbook PDF so the engine can "answer questions about itself", then about my résumé (shows the "I don't know" guardrail flipping to real answers once a doc is ingested).
+

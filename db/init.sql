@@ -4,11 +4,17 @@
 CREATE EXTENSION IF NOT EXISTS vector;
 
 CREATE TABLE IF NOT EXISTS documents (
-  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  title      text NOT NULL,
-  content    text NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now()
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  title        text NOT NULL,
+  content      text NOT NULL,
+  source_type  text NOT NULL DEFAULT 'text',   -- text | txt | pdf
+  content_hash text,                            -- sha256 of normalized text, for idempotent re-upload
+  created_at   timestamptz NOT NULL DEFAULT now()
 );
+
+-- Same content ingested twice is a no-op (idempotency, FR-ING-06).
+CREATE UNIQUE INDEX IF NOT EXISTS idx_documents_content_hash
+  ON documents (content_hash);
 
 CREATE TABLE IF NOT EXISTS document_chunks (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),

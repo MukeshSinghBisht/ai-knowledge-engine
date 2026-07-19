@@ -12,7 +12,7 @@
 | Project | AI Knowledge Engine (`ai-knowledge-engine`) |
 | Author | Mukesh Bisht |
 | Status | Living document — updated per phase |
-| Version | 0.4 (Phase 1 + tool calling; Phase 2 store + search; Phase 3 core RAG `/query` done) |
+| Version | 0.6 (Phase 3: RAG `/query` + file upload/dedup + wipe endpoint; demo runbook added) |
 | Related | `ai-backend-engineer-roadmap/ROADMAP.md`, `ROADMAP` CHECKLIST, `docs/interview-notes.md` |
 
 **How to use this doc:** Before building a feature, open the matching requirement
@@ -165,12 +165,12 @@ Query:   question -> embed -> vector search top-k -> build context
 ### 7.4 Ingestion (Phase 2 Week 4 → Phase 3)
 | ID | Priority | Requirement | Acceptance criteria |
 |----|----------|-------------|---------------------|
-| FR-ING-01 | M | `POST /documents` ingests raw text | **DONE (basic).** Stores document + chunks synchronously. Week 4 adds async + files. |
-| FR-ING-02 | M | Chunking with overlap | **DONE (basic).** Char-based sliding window (size 500, overlap 100). Week 4: token-aware sizing. |
-| FR-ING-03 | M | Batch embed + persist chunks | **DONE (sequential).** Each chunk embedded and inserted. Week 4: true batching. |
-| FR-ING-04 | M | PDF + TXT upload with extraction | Pending — Week 4. File parsed to text before chunking. |
-| FR-ING-05 | S | Reject invalid rows/files with clear errors | Row/file-level error messages; partial success for batch |
-| FR-ING-06 | S | Idempotency on duplicate document hash | Re-upload of same content is not re-ingested |
+| FR-ING-01 | M | `POST /documents` ingests raw text | **DONE (basic).** Stores document + chunks synchronously. Async is Phase 4. |
+| FR-ING-02 | M | Chunking with overlap | **DONE (basic).** Char-based sliding window (size 500, overlap 100). Later: token-aware sizing. |
+| FR-ING-03 | M | Batch embed + persist chunks | **DONE (sequential).** Each chunk embedded and inserted. Later: true batching. |
+| FR-ING-04 | M | PDF + TXT upload with extraction | **DONE.** `POST /documents/upload` (multipart, max 10 MB); `pdf-parse` for PDF, utf-8 for TXT; shares the same chunk/embed/store path. |
+| FR-ING-05 | S | Reject invalid rows/files with clear errors | **DONE.** Unsupported type / empty / image-only PDF → 400 with a clear message. |
+| FR-ING-06 | S | Idempotency on duplicate document hash | **DONE.** `content_hash` (sha256 of normalized text) with a unique index; re-upload returns the existing doc as `duplicate: true` and embeds nothing. |
 
 ### 7.5 RAG generation (Phase 3, Week 5–6)
 | ID | Priority | Requirement | Acceptance criteria |
@@ -286,7 +286,9 @@ Track ingestion job id, status, document reference, error, timestamps.
 | POST | `/chat` | FR-CHAT-01..03 | 1 | Done |
 | POST | `/chat/structured` | FR-CHAT-04..06 | 2 | Done |
 | POST | `/chat/tools` | FR-TOOL-01 | 2 | Done (Ollama; others stubbed) |
-| POST | `/documents` | FR-ING-01..06 | 2–3 | Done (basic text; files/async in Wk4) |
+| POST | `/documents` | FR-ING-01..03,06 | 2–3 | Done (raw text + dedup) |
+| POST | `/documents/upload` | FR-ING-04..06 | 3 | Done (.txt/.pdf, max 10 MB, dedup) |
+| DELETE | `/documents` | — | 3 | Done (wipe all — demo/dev reset utility) |
 | POST | `/search` | FR-RAG-02..04 | 2 | Done (top-k cosine) |
 | POST | `/query` | FR-GEN-01..04 | 3 | Done (grounded RAG answer + sources) |
 | GET | `/jobs/:id` | FR-JOB-03 | 4 | Planned |

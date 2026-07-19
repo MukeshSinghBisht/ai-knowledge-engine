@@ -14,7 +14,12 @@ const SYSTEM_PROMPT = [
   'You are a knowledge assistant. Answer the user question using ONLY the numbered',
   'context sources provided below. Do not use any outside knowledge.',
   "If the answer is not contained in the sources, reply exactly: \"I don't know based on the available documents.\"",
-  'Keep the answer concise and factual. When useful, refer to sources like [Source 1].',
+  'Use the EXACT names, numbers, and terms as they appear in the sources — copy proper',
+  'nouns and product/model names verbatim and do NOT paraphrase, generalize, or',
+  'substitute a broader term for a specific one (for example, do not replace a specific',
+  'model name with the tool that runs it).',
+  'Keep the answer to one or two sentences, factual, with no meta commentary about the',
+  'sources themselves.',
 ].join(' ');
 
 @Injectable()

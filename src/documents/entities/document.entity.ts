@@ -16,6 +16,12 @@ export class DocumentEntity {
   @Column('text')
   content: string;
 
+  @Column({ name: 'source_type', type: 'text', default: 'text' })
+  sourceType: string;
+
+  @Column({ name: 'content_hash', type: 'text', nullable: true })
+  contentHash: string | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 }
