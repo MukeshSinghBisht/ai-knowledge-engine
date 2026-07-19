@@ -28,6 +28,20 @@ export class ChatService {
     ]);
   }
 
+  sendToolMessage(dto: ChatRequestDto) {
+    return this.llmService.chatWithTools([
+      {
+        role: 'system',
+        content:
+          'You are a helpful assistant with access to tools. ' +
+          'When the user asks for the current date/time or an exact word count, ' +
+          'call the matching tool instead of guessing. ' +
+          'After a tool returns, reply to the user in one short, natural sentence.',
+      },
+      { role: 'user', content: dto.message },
+    ]);
+  }
+
   async extractDocumentMetadata(
     dto: StructuredChatRequestDto,
   ): Promise<StructuredChatResponseDto> {

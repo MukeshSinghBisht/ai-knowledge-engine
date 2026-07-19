@@ -1,11 +1,18 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
-import { ChatMessage, ChatResult, LlmProvider, StructuredChatResult } from '../llm.types';
+import {
+  ChatMessage,
+  ChatResult,
+  LlmProvider,
+  StructuredChatResult,
+  ToolChatResult,
+} from '../llm.types';
 import {
   DOCUMENT_METADATA_JSON_SCHEMA,
   DOCUMENT_METADATA_SYSTEM_PROMPT,
 } from '../schemas/document-metadata.schema';
+import { TOOL_DEFINITIONS, runTool } from '../tools/tools';
 
 @Injectable()
 export class OllamaProvider implements LlmProvider {
@@ -64,6 +71,123 @@ export class OllamaProvider implements LlmProvider {
           totalTokens: response.usage?.total_tokens ?? 0,
         },
       };
+    } catch (error) {
+      if (error instanceof ServiceUnavailableException) {
+        throw error;
+      }
+
+      if (error instanceof OpenAI.APIError) {
+        const hint =
+          error.status === undefined || error.status >= 500
+            ? ' Is Ollama running? Try: ollama serve'
+            : '';
+
+        throw new ServiceUnavailableException(
+          `Ollama error: ${error.message}.${hint}`,
+        );
+      }
+
+      const message =
+        error instanceof Error ? error.message : 'Unknown Ollama error';
+
+      throw new ServiceUnavailableException(
+        `Ollama error: ${message}. Is Ollama running at ${this.baseUrl}?`,
+      );
+    }
+  }
+
+  async chatWithTools(messages: ChatMessage[]): Promise<ToolChatResult> {
+    const client = this.getClient();
+
+    // Working history grows every round: we append the model's tool requests
+    // and our tool results, then re-send the whole thing (the model is stateless).
+    const workingMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] =
+      messages.map((message) => ({
+        role: message.role,
+        content: message.content,
+      }));
+
+    const toolsUsed: string[] = [];
+    const usage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+    const maxRounds = 5;
+
+    try {
+      for (let round = 0; round < maxRounds; round++) {
+        const response = await client.chat.completions.create({
+          model: this.chatModel,
+          messages: workingMessages,
+          tools: TOOL_DEFINITIONS as OpenAI.Chat.Completions.ChatCompletionTool[],
+        });
+
+        usage.promptTokens += response.usage?.prompt_tokens ?? 0;
+        usage.completionTokens += response.usage?.completion_tokens ?? 0;
+        usage.totalTokens += response.usage?.total_tokens ?? 0;
+
+        const message = response.choices[0]?.message;
+
+        if (!message) {
+          throw new ServiceUnavailableException(
+            'Ollama returned an empty response',
+          );
+        }
+
+        const toolCalls = message.tool_calls ?? [];
+
+        // No tool requested → this is the final answer.
+        if (toolCalls.length === 0) {
+          const reply = message.content;
+
+          if (!reply) {
+            throw new ServiceUnavailableException(
+              'Ollama returned an empty response',
+            );
+          }
+
+          return {
+            reply,
+            toolsUsed,
+            model: response.model ?? this.chatModel,
+            provider: this.name,
+            usage,
+          };
+        }
+
+        // Model wants tools: record its request, run each tool, feed results back.
+        workingMessages.push(
+          message as OpenAI.Chat.Completions.ChatCompletionMessageParam,
+        );
+
+        for (const toolCall of toolCalls) {
+          if (toolCall.type !== 'function') {
+            continue;
+          }
+
+          let args: Record<string, unknown> = {};
+          try {
+            args = toolCall.function.arguments
+              ? (JSON.parse(toolCall.function.arguments) as Record<
+                  string,
+                  unknown
+                >)
+              : {};
+          } catch {
+            args = {};
+          }
+
+          const result = await runTool(toolCall.function.name, args);
+          toolsUsed.push(toolCall.function.name);
+
+          workingMessages.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            content: result,
+          });
+        }
+      }
+
+      throw new ServiceUnavailableException(
+        `Tool calling did not finish within ${maxRounds} rounds`,
+      );
     } catch (error) {
       if (error instanceof ServiceUnavailableException) {
         throw error;

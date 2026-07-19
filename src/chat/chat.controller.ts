@@ -11,6 +11,7 @@ import { ChatRequestDto } from './dto/chat-request.dto';
 import { ChatResponseDto } from './dto/chat-response.dto';
 import { StructuredChatRequestDto } from './dto/structured-chat-request.dto';
 import { StructuredChatResponseDto } from './dto/structured-chat-response.dto';
+import { ToolChatResponseDto } from './dto/tool-chat-response.dto';
 @ApiTags('chat')
 @Controller('chat')
 export class ChatController {
@@ -49,5 +50,26 @@ export class ChatController {
   })
   extractMetadata(@Body() dto: StructuredChatRequestDto) {
     return this.chatService.extractDocumentMetadata(dto);
+  }
+
+  @Post('tools')
+  @ApiOperation({
+    summary: 'Chat with tool/function calling',
+    description:
+      'Sends a message to the LLM with tools available (getCurrentDate, countWords). ' +
+      'The model may call a tool; the backend runs it and feeds the result back until a final answer is produced. ' +
+      'Currently implemented for the Ollama provider.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Final reply plus the names of any tools the model called',
+    type: ToolChatResponseDto,
+  })
+  @ApiServiceUnavailableResponse({
+    description:
+      'LLM API error, provider unavailable, or tool calling not supported by the active provider',
+  })
+  sendToolMessage(@Body() dto: ChatRequestDto) {
+    return this.chatService.sendToolMessage(dto);
   }
 }

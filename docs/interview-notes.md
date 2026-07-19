@@ -45,3 +45,17 @@ Add 5–10 bullet answers here after each study session (30 min/day).
 - Always **validate output**; use confidence thresholds for automation
 - In my project: metadata at ingest, optional query planning before RAG, safety before index
 
+### Tool / function calling
+
+- A **tool** = a backend function I expose to the model as a **description** (name + args), not the code itself.
+- Two separate parts: **definition** (schema the model sees) vs **handler** (the real code only my backend runs).
+- The model can only **request** a call; **my backend decides** whether to run it → security boundary ("model proposes, code disposes").
+- It's a **loop over a growing `messages` array**: model asks for tool → I run it → append result as `role:"tool"` → re-send everything → model gives final answer.
+- Model is **stateless**: every round I re-send the full history (tool results included). Ties back to context window.
+- Always guard the loop with **maxRounds** (I used 5) — never trust an external system to terminate.
+- **Structured output vs tool calling:** structured = shape of the *answer*; tool = the model *triggers an action* and continues with the result.
+- **When model answers alone:** general knowledge / reasoning. **When a tool is needed:** live data (today's date), exact math (word count), or an action in my system.
+- My `/chat/tools` demo tools: `getCurrentDate` (no args) and `countWords({text})`; response returns `toolsUsed` to prove the model actually called code.
+- **Real lesson from testing:** on `llama3.2` (small local model), a general-knowledge question ("what is RAG?") sometimes **over-called a tool and hallucinated**. The loop worked fine — it's a **model-quality** issue. Bigger models (GPT-4o-mini/Gemini) decide tool-use more reliably.
+- Basic RAG does **not** need tool calling (my backend does retrieval). Tools only matter for **agentic RAG**, where the model decides when/what to search.
+

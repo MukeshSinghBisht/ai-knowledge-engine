@@ -1,7 +1,13 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
-import { ChatMessage, ChatResult, LlmProvider, StructuredChatResult } from '../llm.types';
+import {
+  ChatMessage,
+  ChatResult,
+  LlmProvider,
+  StructuredChatResult,
+  ToolChatResult,
+} from '../llm.types';
 import {
   DOCUMENT_METADATA_JSON_SCHEMA,
 } from '../schemas/document-metadata.schema';
@@ -73,6 +79,12 @@ export class OpenAiProvider implements LlmProvider {
 
       throw error;
     }
+  }
+
+  async chatWithTools(): Promise<ToolChatResult> {
+    throw new ServiceUnavailableException(
+      'Tool calling is not implemented for the OpenAI provider yet. Set LLM_PROVIDER=ollama to use POST /chat/tools.',
+    );
   }
 
   async chatStructured(messages: ChatMessage[]): Promise<StructuredChatResult> {

@@ -1,7 +1,13 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
-import { ChatMessage, ChatResult, LlmProvider, StructuredChatResult } from '../llm.types';
+import {
+  ChatMessage,
+  ChatResult,
+  LlmProvider,
+  StructuredChatResult,
+  ToolChatResult,
+} from '../llm.types';
 import { DOCUMENT_METADATA_SYSTEM_PROMPT } from '../schemas/document-metadata.schema';
 
 @Injectable()
@@ -84,6 +90,12 @@ export class GeminiProvider implements LlmProvider {
 
       throw new ServiceUnavailableException(`Gemini error: ${message}`);
     }
+  }
+
+  async chatWithTools(): Promise<ToolChatResult> {
+    throw new ServiceUnavailableException(
+      'Tool calling is not implemented for the Gemini provider yet. Set LLM_PROVIDER=ollama to use POST /chat/tools.',
+    );
   }
 
   async chatStructured(messages: ChatMessage[]): Promise<StructuredChatResult> {
