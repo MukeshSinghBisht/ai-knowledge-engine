@@ -147,6 +147,38 @@ docs, or support tickets and it works exactly the same way."*
 
 ## Notes
 
-- Keep your résumé PDF **outside the repo** — it's personal data and should not be committed.
 - If a request fails with a connection error after a DB reset, restart the API.
 - Scanned/image-only PDFs won't work (no extractable text) — they return a 400.
+
+---
+
+## Recording the demo video (for the README)
+
+Recruiters skim — a 60–90 second clip beats a wall of text. Keep it short and captioned.
+
+### Tools (free, Windows)
+
+- **ScreenToGif** — easiest for a lightweight GIF: record a region, trim, export `.gif`.
+- **OBS Studio** — best quality; record `.mp4`, then either keep it as MP4 or convert to GIF.
+- **Xbox Game Bar** (`Win + G`) — built into Windows, quick `.mp4` capture.
+
+### Shot list (aim for ~75 seconds)
+
+1. **(0:00–0:08)** Open `http://localhost:3000/docs`. Say/caption: *"A RAG engine — it only answers from documents I give it."*
+2. **(0:08–0:15)** `DELETE /documents` → Execute. Caption: *"Starting empty."*
+3. **(0:15–0:25)** `POST /documents/upload` → pick `ai-knowledge-engine-handbook.pdf` → Execute. Show `chunkCount`. Caption: *"Feed it a PDF — split into chunks + embedded."*
+4. **(0:25–0:45)** `POST /query` → "What embedding model does this project use?" → show the answer **and expand `sources`**. Caption: *"Answers with citations."*
+5. **(0:45–0:55)** `POST /query` → "What is the candidate's experience?" → **"I don't know."** Caption: *"It won't guess."*
+6. **(0:55–1:05)** `POST /documents/upload` → résumé PDF → Execute.
+7. **(1:05–1:15)** Repeat the same query → now it answers about the résumé. Caption: *"Same engine, new document, instant expert."*
+
+### Tips
+
+- Record at a smaller window size so text stays readable in a GIF.
+- Trim dead air (model latency) — cut the waiting time so it feels snappy.
+- Keep the GIF under ~10 MB if committing to the repo; otherwise use the MP4-on-GitHub option.
+
+### Embed it
+
+- **GIF:** save as `demo/demo.gif`, then uncomment `![Demo](./demo/demo.gif)` in the root README.
+- **MP4:** edit the root README on github.com, drag the `.mp4` into the editor — GitHub hosts it and inserts the player automatically.

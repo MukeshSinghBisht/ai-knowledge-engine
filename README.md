@@ -10,6 +10,25 @@ Later phases add async ingestion, Redis caching, streaming, and multi-tenant aut
 
 See [docs/BRD.md](./docs/BRD.md) for the full phased requirements.
 
+## Demo
+
+<!--
+  RECORD A ~60-90s clip of the flow, then embed it here. Two options:
+
+  A) GIF committed to the repo (works inline everywhere):
+     ![Demo](./demo/demo.gif)
+
+  B) MP4 hosted by GitHub (better quality, no repo bloat):
+     Open this README on github.com in edit mode, drag the .mp4 into the editor,
+     and GitHub inserts a hosted <video>/link automatically. Paste that here.
+
+  Uncomment the line below (option A) once demo/demo.gif exists.
+-->
+
+<!-- ![Demo](./demo/demo.gif) -->
+
+_Demo video coming soon._ Full step-by-step walkthrough: [demo/README.md](./demo/README.md).
+
 ## Prerequisites
 
 - Node.js 20+ (this project was built with **v22.22.0**)
