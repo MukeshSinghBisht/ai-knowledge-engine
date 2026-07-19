@@ -59,3 +59,27 @@ Add 5–10 bullet answers here after each study session (30 min/day).
 - **Real lesson from testing:** on `llama3.2` (small local model), a general-knowledge question ("what is RAG?") sometimes **over-called a tool and hallucinated**. The loop worked fine — it's a **model-quality** issue. Bigger models (GPT-4o-mini/Gemini) decide tool-use more reliably.
 - Basic RAG does **not** need tool calling (my backend does retrieval). Tools only matter for **agentic RAG**, where the model decides when/what to search.
 
+## Week 3 — pgvector semantic search
+
+### Embeddings + storage
+
+- **Chunking:** split a document into small **overlapping** pieces before embedding. Small pieces embed with sharper meaning; overlap stops an idea being cut at a boundary. My default: size 500 chars, overlap 100 (Week 4 → token-aware).
+- **One embedding per chunk**, stored in Postgres via the **pgvector** extension (`vector(768)` column, matches `nomic-embed-text`).
+- **Same `embed()` for store and query** — a chunk and a query only compare if they came from the same model/dimension.
+- pgvector is an **extension**, not core Postgres → used the Docker `pgvector/pgvector` image so the `vector` type is prebuilt (no compiling).
+
+### Search
+
+- Query flow: **query → embed → compare to stored vectors → top-k**. Backend does retrieval; the LLM isn't involved yet (retrieval only).
+- **Cosine distance** operator `<=>`; similarity = `1 - distance`. Ranked `ORDER BY embedding <=> query LIMIT topK`.
+- **topK** = how many best matches to return (it's the SQL `LIMIT`). Trade-off: too few misses context, too many adds noise/tokens. Sweet spot 3–5.
+- **HNSW index** (`vector_cosine_ops`) for fast approximate nearest-neighbour; know IVFFlat exists too.
+- Proof it's semantic not keyword: "how long is the **guarantee**?" matched a doc saying "**warranty**" — different words, same meaning.
+- To make a specific doc win, query content **unique** to it; if two docs cover the same topic they compete.
+
+### Design notes
+
+- **TypeORM** for the connection + entities; the `vector` column is handled with **raw parameterized SQL** (`$n::vector`) because the driver has no native vector type.
+- Schema created by `db/init.sql` (extension + tables + index), so `synchronize: false`.
+- Gotcha: a native Postgres already held port 5432 → ran the container on **5433**. Two Postgres on one port = silent wrong-DB connection.
+

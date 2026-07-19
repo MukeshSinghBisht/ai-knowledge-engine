@@ -28,6 +28,7 @@ async function bootstrap() {
     .setVersion('0.1.0')
     .addTag('health', 'Service health')
     .addTag('chat', 'LLM chat completions (Gemini or OpenAI)')
+    .addTag('documents', 'Document ingestion + semantic search (pgvector)')
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);

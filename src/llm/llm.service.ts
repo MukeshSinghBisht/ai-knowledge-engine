@@ -52,6 +52,10 @@ export class LlmService {
     return this.getProvider().chatWithTools(messages);
   }
 
+  embed(text: string): Promise<number[]> {
+    return this.getProvider().embed(text);
+  }
+
   private getProvider(): LlmProvider {
     switch (this.providerName) {
       case 'ollama':

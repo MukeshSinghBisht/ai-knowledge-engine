@@ -1,14 +1,20 @@
 # AI Knowledge Engine
 
-Phase 1 (Week 1): NestJS chat API with switchable **Ollama**, **Google Gemini**, or **OpenAI**.
+NestJS API with switchable **Ollama**, **Google Gemini**, or **OpenAI** providers.
 
-Later phases add pgvector RAG, BullMQ ingestion, Redis caching, streaming, and multi-tenant auth.
+- **Phase 1:** chat, structured output, tool/function calling
+- **Phase 2 (Week 3):** pgvector semantic search — store documents (chunk + embed) and search by meaning
+
+Later phases add full RAG answers, BullMQ ingestion, Redis caching, streaming, and multi-tenant auth.
+
+See [docs/BRD.md](./docs/BRD.md) for the full phased requirements.
 
 ## Prerequisites
 
 - Node.js 20+ (this project was built with **v22.22.0**)
 - npm **10.9.7** (or compatible)
 - **Ollama** (default, local, free) — [docs/ollama-setup.md](./docs/ollama-setup.md)
+- **Docker** (for Postgres + pgvector, Phase 2+)
 
 ## LLM providers
 
@@ -47,8 +53,17 @@ Install Ollama from https://ollama.com/download, then:
 ```bash
 ollama pull llama3.2
 ollama pull nomic-embed-text
+```
+
+Start the database (Postgres + pgvector), then the app:
+
+```bash
+docker compose up -d      # Postgres + pgvector on host port 5433
 npm run start:dev
 ```
+
+> Note: the container maps host port **5433** (5432 is often taken by a local Postgres).
+> Change `DB_PORT` in `.env` + `docker-compose.yml` if needed.
 
 `.env` (default):
 
@@ -136,14 +151,59 @@ curl -X POST http://localhost:3000/chat/structured \
 }
 ```
 
+### Store a document (Week 3)
+
+Chunks the text, embeds each chunk (`nomic-embed-text`), and stores vectors in pgvector.
+
+```bash
+curl -X POST http://localhost:3000/documents \
+  -H "Content-Type: application/json" \
+  -d "{\"text\":\"Return Policy\\n\\nItems may be returned within 30 days of purchase with a valid receipt.\"}"
+```
+
+**Response:** `{ "id": "...", "title": "Return Policy", "chunkCount": 1 }`
+
+### Semantic search (Week 3)
+
+Embeds the query and returns the top-k most similar chunks by cosine similarity.
+
+```bash
+curl -X POST http://localhost:3000/search \
+  -H "Content-Type: application/json" \
+  -d "{\"query\":\"how many days to return an item?\",\"topK\":3}"
+```
+
+**Response:**
+
+```json
+{
+  "query": "how many days to return an item?",
+  "results": [
+    {
+      "chunkId": "...",
+      "documentId": "...",
+      "title": "Return Policy",
+      "chunkIndex": 0,
+      "content": "Return Policy Items may be returned within 30 days...",
+      "score": 0.78
+    }
+  ]
+}
+```
+
 ## Project structure
 
 ```text
 src/
-  chat/       POST /chat, POST /chat/structured
+  chat/       POST /chat, /chat/structured, /chat/tools
+  documents/  POST /documents, /search (pgvector)
   health/     GET /health
-  llm/        Ollama + Gemini + OpenAI providers
+  llm/        Ollama + Gemini + OpenAI providers, tools/, embeddings
+db/
+  init.sql    pgvector extension + schema + HNSW index
+docker-compose.yml   Postgres 16 + pgvector
 docs/
+  BRD.md
   ollama-setup.md
   gemini-setup.md
   llm-provider-comparison.md

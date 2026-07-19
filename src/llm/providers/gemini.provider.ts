@@ -98,6 +98,12 @@ export class GeminiProvider implements LlmProvider {
     );
   }
 
+  async embed(): Promise<number[]> {
+    throw new ServiceUnavailableException(
+      'Embeddings are not implemented for the Gemini provider yet. Set LLM_PROVIDER=ollama (nomic-embed-text, 768 dims).',
+    );
+  }
+
   async chatStructured(messages: ChatMessage[]): Promise<StructuredChatResult> {
     try {
       const systemInstruction =

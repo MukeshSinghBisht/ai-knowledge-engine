@@ -20,11 +20,15 @@ export class OllamaProvider implements LlmProvider {
 
   private client: OpenAI | null = null;
   private readonly chatModel: string;
+  private readonly embeddingModel: string;
   private readonly baseUrl: string;
 
   constructor(private readonly configService: ConfigService) {
     this.chatModel =
       this.configService.get<string>('OLLAMA_CHAT_MODEL') ?? 'llama3.2';
+    this.embeddingModel =
+      this.configService.get<string>('OLLAMA_EMBEDDING_MODEL') ??
+      'nomic-embed-text';
     this.baseUrl =
       this.configService.get<string>('OLLAMA_BASE_URL') ??
       'http://localhost:11434/v1';
@@ -92,6 +96,47 @@ export class OllamaProvider implements LlmProvider {
 
       throw new ServiceUnavailableException(
         `Ollama error: ${message}. Is Ollama running at ${this.baseUrl}?`,
+      );
+    }
+  }
+
+  async embed(text: string): Promise<number[]> {
+    try {
+      const response = await this.getClient().embeddings.create({
+        model: this.embeddingModel,
+        input: text,
+      });
+
+      const vector = response.data[0]?.embedding;
+
+      if (!vector || vector.length === 0) {
+        throw new ServiceUnavailableException(
+          'Ollama returned an empty embedding',
+        );
+      }
+
+      return vector;
+    } catch (error) {
+      if (error instanceof ServiceUnavailableException) {
+        throw error;
+      }
+
+      if (error instanceof OpenAI.APIError) {
+        const hint =
+          error.status === undefined || error.status >= 500
+            ? ` Is the embedding model pulled? Try: ollama pull ${this.embeddingModel}`
+            : '';
+
+        throw new ServiceUnavailableException(
+          `Ollama embedding error: ${error.message}.${hint}`,
+        );
+      }
+
+      const message =
+        error instanceof Error ? error.message : 'Unknown Ollama error';
+
+      throw new ServiceUnavailableException(
+        `Ollama embedding error: ${message}. Is Ollama running at ${this.baseUrl}?`,
       );
     }
   }

@@ -38,4 +38,5 @@ export interface LlmProvider {
   chat(messages: ChatMessage[]): Promise<ChatResult>;
   chatStructured(messages: ChatMessage[]): Promise<StructuredChatResult>;
   chatWithTools(messages: ChatMessage[]): Promise<ToolChatResult>;
+  embed(text: string): Promise<number[]>;
 }

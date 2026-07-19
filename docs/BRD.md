@@ -12,7 +12,7 @@
 | Project | AI Knowledge Engine (`ai-knowledge-engine`) |
 | Author | Mukesh Bisht |
 | Status | Living document — updated per phase |
-| Version | 0.2 (Phase 1 complete incl. optional tool calling; Phase 2 next) |
+| Version | 0.3 (Phase 1 done + tool calling; Phase 2 Week 3 done: pgvector store + search) |
 | Related | `ai-backend-engineer-roadmap/ROADMAP.md`, `ROADMAP` CHECKLIST, `docs/interview-notes.md` |
 
 **How to use this doc:** Before building a feature, open the matching requirement
@@ -149,26 +149,26 @@ Query:   question -> embed -> vector search top-k -> build context
 ### 7.2 Vector storage & schema (Phase 2, Week 3)
 | ID | Priority | Requirement | Acceptance criteria |
 |----|----------|-------------|---------------------|
-| FR-DB-01 | M | Docker Compose brings up Postgres + pgvector | `docker compose up` exposes DB with `vector` extension |
-| FR-DB-02 | M | `documents` and `document_chunks` tables exist | Migration creates schema in §9 |
-| FR-DB-03 | M | Chunk embeddings stored in a `vector(n)` column | Dimension matches embedding model |
-| FR-DB-04 | S | Vector index for similarity (IVFFlat/HNSW) | Index created; search uses it |
+| FR-DB-01 | M | Docker Compose brings up Postgres + pgvector | **DONE.** `pgvector/pgvector:pg16` in `docker-compose.yml`; `db/init.sql` creates the `vector` extension. Host port 5433 (5432 taken by native Postgres on dev machine). |
+| FR-DB-02 | M | `documents` and `document_chunks` tables exist | **DONE.** Created by `db/init.sql`; TypeORM entities map them (`synchronize: false`). |
+| FR-DB-03 | M | Chunk embeddings stored in a `vector(n)` column | **DONE.** `embedding vector(768)` (nomic-embed-text); written via raw `$n::vector` SQL. |
+| FR-DB-04 | S | Vector index for similarity (IVFFlat/HNSW) | **DONE.** HNSW index with `vector_cosine_ops`. |
 
 ### 7.3 Retrieval / semantic search (Phase 2, Week 3–4)
 | ID | Priority | Requirement | Acceptance criteria |
 |----|----------|-------------|---------------------|
-| FR-RAG-01 | M | Generate embeddings via the LLM layer | Same model for ingest + query |
-| FR-RAG-02 | M | `POST /search` returns top-k chunks with scores | Ranked by cosine similarity; includes score |
-| FR-RAG-03 | M | Search returns chunk metadata | chunk id, document id, content, score |
-| FR-RAG-04 | S | `page`/`pageSize` (default 1/10, cap 100) on list-style results | Pagination enforced |
+| FR-RAG-01 | M | Generate embeddings via the LLM layer | **DONE.** `LlmService.embed()` → Ollama `nomic-embed-text`; same model for ingest + query. |
+| FR-RAG-02 | M | `POST /search` returns top-k chunks with scores | **DONE.** Cosine similarity (`1 - (embedding <=> query)`), ranked, `topK` (default 5, max 50). |
+| FR-RAG-03 | M | Search returns chunk metadata | **DONE.** Returns chunkId, documentId, title, chunkIndex, content, score. |
+| FR-RAG-04 | S | `page`/`pageSize` (default 1/10, cap 100) on list-style results | Pending — search uses `topK`; page/pageSize when a list endpoint is added. |
 
 ### 7.4 Ingestion (Phase 2 Week 4 → Phase 3)
 | ID | Priority | Requirement | Acceptance criteria |
 |----|----------|-------------|---------------------|
-| FR-ING-01 | M | `POST /documents` ingests raw text | Document + chunks persisted |
-| FR-ING-02 | M | Chunking with overlap | Configurable size (~500–800 tokens) + overlap (~50–100) |
-| FR-ING-03 | M | Batch embed + persist chunks | All chunks embedded and stored |
-| FR-ING-04 | M | PDF + TXT upload with extraction | File parsed to text before chunking |
+| FR-ING-01 | M | `POST /documents` ingests raw text | **DONE (basic).** Stores document + chunks synchronously. Week 4 adds async + files. |
+| FR-ING-02 | M | Chunking with overlap | **DONE (basic).** Char-based sliding window (size 500, overlap 100). Week 4: token-aware sizing. |
+| FR-ING-03 | M | Batch embed + persist chunks | **DONE (sequential).** Each chunk embedded and inserted. Week 4: true batching. |
+| FR-ING-04 | M | PDF + TXT upload with extraction | Pending — Week 4. File parsed to text before chunking. |
 | FR-ING-05 | S | Reject invalid rows/files with clear errors | Row/file-level error messages; partial success for batch |
 | FR-ING-06 | S | Idempotency on duplicate document hash | Re-upload of same content is not re-ingested |
 
@@ -255,8 +255,12 @@ Query:   question -> embed -> vector search top-k -> build context
 
 ### 9.3 Embedding dimension rule
 The `vector(n)` dimension **must match the embedding model** and be identical for
-ingest and query. Changing models requires re-embedding. Record the chosen model +
-dimension in `.env` / config and in this section when locked.
+ingest and query. Changing models requires re-embedding.
+
+**LOCKED (v0.3):** model = **`nomic-embed-text`** (Ollama), dimension = **768**.
+Set via `OLLAMA_EMBEDDING_MODEL` in `.env`; column is `embedding vector(768)` in
+`db/init.sql`. Switching to e.g. OpenAI `text-embedding-3-small` (1536) means a new
+column dimension and a full re-embed.
 
 ### 9.4 `jobs` (or BullMQ-managed) — Phase 4
 Track ingestion job id, status, document reference, error, timestamps.
@@ -282,8 +286,8 @@ Track ingestion job id, status, document reference, error, timestamps.
 | POST | `/chat` | FR-CHAT-01..03 | 1 | Done |
 | POST | `/chat/structured` | FR-CHAT-04..06 | 2 | Done |
 | POST | `/chat/tools` | FR-TOOL-01 | 2 | Done (Ollama; others stubbed) |
-| POST | `/documents` | FR-ING-01..06 | 2–3 | Planned |
-| POST | `/search` | FR-RAG-02..04 | 2 | Planned |
+| POST | `/documents` | FR-ING-01..06 | 2–3 | Done (basic text; files/async in Wk4) |
+| POST | `/search` | FR-RAG-02..04 | 2 | Done (top-k cosine) |
 | POST | `/query` | FR-GEN-01..04 | 3 | Planned |
 | GET | `/jobs/:id` | FR-JOB-03 | 4 | Planned |
 | POST | `/chat/stream` | FR-STR-01 | 5 | Planned |
@@ -301,7 +305,7 @@ LLM output, `BadRequest` (400) for input validation.
 | Phase | Exit criteria |
 |-------|---------------|
 | 1 | Demo `curl` chat + structured metadata in README ✅ |
-| 2 | Semantic search returns top-k with scores (retrieval only) |
+| 2 | Semantic search returns top-k with scores (retrieval only) ✅ (Week 3; Week 4 adds files/async ingest) |
 | 3 | Upload doc → ask question → answer + sources |
 | 4 | Async ingestion; API non-blocking on upload |
 | 5 | Live streaming RAG demo |

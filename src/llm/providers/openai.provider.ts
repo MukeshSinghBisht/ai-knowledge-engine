@@ -87,6 +87,12 @@ export class OpenAiProvider implements LlmProvider {
     );
   }
 
+  async embed(): Promise<number[]> {
+    throw new ServiceUnavailableException(
+      'Embeddings are not implemented for the OpenAI provider yet. Set LLM_PROVIDER=ollama (nomic-embed-text, 768 dims).',
+    );
+  }
+
   async chatStructured(messages: ChatMessage[]): Promise<StructuredChatResult> {
     try {
       const response = await this.getClient().chat.completions.create({
