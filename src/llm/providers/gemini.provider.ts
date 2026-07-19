@@ -16,10 +16,15 @@ export class GeminiProvider implements LlmProvider {
 
   private client: GoogleGenerativeAI | null = null;
   private readonly chatModel: string;
+  private readonly embeddingModel: string;
 
   constructor(private readonly configService: ConfigService) {
     this.chatModel =
       this.configService.get<string>('GEMINI_CHAT_MODEL') ?? 'gemini-2.0-flash';
+    // text-embedding-004 outputs 768 dims, matching the vector(768) column.
+    this.embeddingModel =
+      this.configService.get<string>('GEMINI_EMBEDDING_MODEL') ??
+      'text-embedding-004';
   }
 
   private getClient(): GoogleGenerativeAI {
@@ -98,10 +103,34 @@ export class GeminiProvider implements LlmProvider {
     );
   }
 
-  async embed(): Promise<number[]> {
-    throw new ServiceUnavailableException(
-      'Embeddings are not implemented for the Gemini provider yet. Set LLM_PROVIDER=ollama (nomic-embed-text, 768 dims).',
-    );
+  async embed(text: string): Promise<number[]> {
+    try {
+      const model = this.getClient().getGenerativeModel({
+        model: this.embeddingModel,
+      });
+
+      const result = await model.embedContent(text);
+      const vector = result.embedding?.values;
+
+      if (!vector || vector.length === 0) {
+        throw new ServiceUnavailableException(
+          'Gemini returned an empty embedding',
+        );
+      }
+
+      return vector;
+    } catch (error) {
+      if (error instanceof ServiceUnavailableException) {
+        throw error;
+      }
+
+      const message =
+        error instanceof Error ? error.message : 'Unknown Gemini error';
+
+      throw new ServiceUnavailableException(
+        `Gemini embedding error: ${message}`,
+      );
+    }
   }
 
   async chatStructured(messages: ChatMessage[]): Promise<StructuredChatResult> {

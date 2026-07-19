@@ -92,16 +92,42 @@ export class DocumentsService {
       };
     }
 
-    let document: DocumentEntity;
+    // Embed everything FIRST, before any DB write. If the embedding provider
+    // fails, nothing is persisted — no orphan document row is left behind.
+    const embeddings = await Promise.all(
+      chunks.map((chunk) => this.llmService.embed(chunk)),
+    );
+
+    // Persist the document and all its chunks atomically.
     try {
-      document = await this.documentRepository.save(
-        this.documentRepository.create({
-          title,
-          content: text,
-          sourceType,
-          contentHash,
-        }),
-      );
+      const documentId = await this.dataSource.transaction(async (manager) => {
+        const document = await manager.save(
+          manager.create(DocumentEntity, {
+            title,
+            content: text,
+            sourceType,
+            contentHash,
+          }),
+        );
+
+        for (let index = 0; index < chunks.length; index++) {
+          await manager.query(
+            `INSERT INTO document_chunks (document_id, chunk_index, content, embedding)
+             VALUES ($1, $2, $3, $4::vector)`,
+            [document.id, index, chunks[index], toVectorLiteral(embeddings[index])],
+          );
+        }
+
+        return document.id;
+      });
+
+      return {
+        id: documentId,
+        title,
+        sourceType,
+        chunkCount: chunks.length,
+        duplicate: false,
+      };
     } catch (error) {
       // Lost a race to another identical upload; the unique index rejected us.
       if (error instanceof QueryFailedError && this.isUniqueViolation(error)) {
@@ -120,27 +146,6 @@ export class DocumentsService {
       }
       throw error;
     }
-
-    let index = 0;
-    for (const chunk of chunks) {
-      const embedding = await this.llmService.embed(chunk);
-
-      await this.dataSource.query(
-        `INSERT INTO document_chunks (document_id, chunk_index, content, embedding)
-         VALUES ($1, $2, $3, $4::vector)`,
-        [document.id, index, chunk, toVectorLiteral(embedding)],
-      );
-
-      index++;
-    }
-
-    return {
-      id: document.id,
-      title,
-      sourceType,
-      chunkCount: chunks.length,
-      duplicate: false,
-    };
   }
 
   /** Delete every document and chunk. Intended for demo resets. */
