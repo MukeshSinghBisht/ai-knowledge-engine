@@ -7,11 +7,9 @@ an expert on any document you give it — no code change.
 
 ## Recorded demo
 
-**[Watch aiknowledgeenginedemo1.mp4](./aiknowledgeenginedemo1.mp4)** · **[Captions (SRT)](./aiknowledgeenginedemo1.srt)**
+![AI Knowledge Engine demo](./demo.gif)
 
-<video src="./aiknowledgeenginedemo1.mp4" controls width="720" title="AI Knowledge Engine demo">
-  <a href="./aiknowledgeenginedemo1.mp4">Download the demo video</a>
-</video>
+**[Full quality (MP4)](./aiknowledgeenginedemo1.mp4)** · **[Captions (SRT)](./aiknowledgeenginedemo1.srt)**
 
 ---
 
@@ -189,9 +187,10 @@ Recruiters skim — a 60–90 second clip beats a wall of text. Keep it short an
 
 ### Embed it
 
-The current recording is already linked from this file and the root README:
+Already linked from this file and the root README:
 
+- GIF (inline preview): [`demo.gif`](./demo.gif)
 - Video: [`aiknowledgeenginedemo1.mp4`](./aiknowledgeenginedemo1.mp4)
 - Captions: [`aiknowledgeenginedemo1.srt`](./aiknowledgeenginedemo1.srt)
 
-To replace it later: overwrite those two files, or use a GIF (`demo/demo.gif`) if you want a lighter inline preview.
+To replace later: overwrite those files and re-run the MP4→GIF conversion if needed.

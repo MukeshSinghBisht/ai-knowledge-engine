@@ -12,15 +12,13 @@ See [docs/BRD.md](./docs/BRD.md) for the full phased requirements.
 
 ## Demo
 
-**[Watch the demo (MP4)](./demo/aiknowledgeenginedemo1.mp4)** · **[Captions (SRT)](./demo/aiknowledgeenginedemo1.srt)**
+![AI Knowledge Engine demo](./demo/demo.gif)
+
+**[Full quality (MP4)](./demo/aiknowledgeenginedemo1.mp4)** · **[Captions (SRT)](./demo/aiknowledgeenginedemo1.srt)**
 
 Open the built-in chat UI at **http://localhost:3000/** (upload a PDF/TXT, ask a question, see answer + sources).
 
 Swagger: **http://localhost:3000/docs** · Full walkthrough: [demo/README.md](./demo/README.md).
-
-<video src="./demo/aiknowledgeenginedemo1.mp4" controls width="720" title="AI Knowledge Engine demo">
-  <a href="./demo/aiknowledgeenginedemo1.mp4">Download the demo video</a>
-</video>
 
 ## Prerequisites
 
@@ -258,7 +256,8 @@ db/
   init.sql    pgvector extension + schema + HNSW index
 demo/
   README.md               step-by-step demo runbook
-  aiknowledgeenginedemo1.mp4   recorded walkthrough
+  demo.gif                inline README preview (~2.7 MB)
+  aiknowledgeenginedemo1.mp4   full-quality walkthrough
   aiknowledgeenginedemo1.srt   captions for the demo video
   ai-knowledge-engine-handbook.pdf   sample doc ("ask the AI about itself")
   generate-handbook.js    regenerates the PDF
@@ -275,8 +274,8 @@ docs/
 See [demo/README.md](./demo/README.md) for a full 5-minute walkthrough: load the bundled
 handbook, ask the engine questions about itself (with cited sources), watch it refuse a
 question it has no data for, then upload another document and watch it answer instantly.
-Use `DELETE /documents` to reset between runs. Recorded clip:
-[aiknowledgeenginedemo1.mp4](./demo/aiknowledgeenginedemo1.mp4)
+Use `DELETE /documents` to reset between runs. Preview: [demo.gif](./demo/demo.gif) ·
+full quality: [aiknowledgeenginedemo1.mp4](./demo/aiknowledgeenginedemo1.mp4)
 ([captions](./demo/aiknowledgeenginedemo1.srt)).
 
 ## Related
