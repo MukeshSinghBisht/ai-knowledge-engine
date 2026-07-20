@@ -5,6 +5,14 @@ about **you** after you feed it your résumé. The "wow" moments are (1) it cite
 sources, (2) it refuses to answer what it doesn't know, and (3) it instantly becomes
 an expert on any document you give it — no code change.
 
+## Recorded demo
+
+**[Watch aiknowledgeenginedemo1.mp4](./aiknowledgeenginedemo1.mp4)** · **[Captions (SRT)](./aiknowledgeenginedemo1.srt)**
+
+<video src="./aiknowledgeenginedemo1.mp4" controls width="720" title="AI Knowledge Engine demo">
+  <a href="./aiknowledgeenginedemo1.mp4">Download the demo video</a>
+</video>
+
 ---
 
 ## 0. Before the demo (setup once)
@@ -181,5 +189,9 @@ Recruiters skim — a 60–90 second clip beats a wall of text. Keep it short an
 
 ### Embed it
 
-- **GIF:** save as `demo/demo.gif`, then uncomment `![Demo](./demo/demo.gif)` in the root README.
-- **MP4:** edit the root README on github.com, drag the `.mp4` into the editor — GitHub hosts it and inserts the player automatically.
+The current recording is already linked from this file and the root README:
+
+- Video: [`aiknowledgeenginedemo1.mp4`](./aiknowledgeenginedemo1.mp4)
+- Captions: [`aiknowledgeenginedemo1.srt`](./aiknowledgeenginedemo1.srt)
+
+To replace it later: overwrite those two files, or use a GIF (`demo/demo.gif`) if you want a lighter inline preview.

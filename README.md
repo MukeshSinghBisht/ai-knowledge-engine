@@ -12,26 +12,15 @@ See [docs/BRD.md](./docs/BRD.md) for the full phased requirements.
 
 ## Demo
 
+**[Watch the demo (MP4)](./demo/aiknowledgeenginedemo1.mp4)** · **[Captions (SRT)](./demo/aiknowledgeenginedemo1.srt)**
+
 Open the built-in chat UI at **http://localhost:3000/** (upload a PDF/TXT, ask a question, see answer + sources).
 
 Swagger: **http://localhost:3000/docs** · Full walkthrough: [demo/README.md](./demo/README.md).
 
-<!--
-  RECORD A ~60-90s clip of the flow, then embed it here. Two options:
-
-  A) GIF committed to the repo (works inline everywhere):
-     ![Demo](./demo/demo.gif)
-
-  B) MP4 hosted by GitHub (better quality, no repo bloat):
-     Open this README on github.com in edit mode, drag the .mp4 into the editor,
-     and GitHub inserts a hosted <video>/link automatically. Paste that here.
-
-  Uncomment the line below (option A) once demo/demo.gif exists.
--->
-
-<!-- ![Demo](./demo/demo.gif) -->
-
-_Demo video coming soon._
+<video src="./demo/aiknowledgeenginedemo1.mp4" controls width="720" title="AI Knowledge Engine demo">
+  <a href="./demo/aiknowledgeenginedemo1.mp4">Download the demo video</a>
+</video>
 
 ## Prerequisites
 
@@ -269,6 +258,8 @@ db/
   init.sql    pgvector extension + schema + HNSW index
 demo/
   README.md               step-by-step demo runbook
+  aiknowledgeenginedemo1.mp4   recorded walkthrough
+  aiknowledgeenginedemo1.srt   captions for the demo video
   ai-knowledge-engine-handbook.pdf   sample doc ("ask the AI about itself")
   generate-handbook.js    regenerates the PDF
 docker-compose.yml   Postgres 16 + pgvector
@@ -279,12 +270,14 @@ docs/
   llm-provider-comparison.md
 ```
 
-## Demo
+## Live walkthrough
 
 See [demo/README.md](./demo/README.md) for a full 5-minute walkthrough: load the bundled
 handbook, ask the engine questions about itself (with cited sources), watch it refuse a
 question it has no data for, then upload another document and watch it answer instantly.
-Use `DELETE /documents` to reset between runs.
+Use `DELETE /documents` to reset between runs. Recorded clip:
+[aiknowledgeenginedemo1.mp4](./demo/aiknowledgeenginedemo1.mp4)
+([captions](./demo/aiknowledgeenginedemo1.srt)).
 
 ## Related
 
