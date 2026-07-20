@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Knowledge Engine</title>
+    <style>
+      :root {
+        --bg: #0f1419;
+        --panel: #1a2332;
+        --panel-2: #243044;
+        --border: #2d3a4f;
+        --text: #e8eef7;
+        --muted: #8b9bb4;
+        --accent: #4f8cff;
+        --accent-2: #6ee7b7;
+        --user: #2a4a7a;
+        --bot: #1e2d42;
+        --danger: #f87171;
+        --radius: 14px;
+        --shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI,
+          Roboto, Helvetica, Arial, sans-serif;
+        background:
+          radial-gradient(1200px 600px at 10% -10%, #1b3a6b55, transparent),
+          radial-gradient(900px 500px at 100% 0%, #0f766e33, transparent),
+          var(--bg);
+        color: var(--text);
+      }
+
+      .app {
+        max-width: 860px;
+        margin: 0 auto;
+        padding: 24px 16px 32px;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 1.35rem;
+        letter-spacing: -0.02em;
+      }
+
+      .subtitle {
+        margin: 4px 0 0;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .toolbar {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      button,
+      .file-btn {
+        border: 1px solid var(--border);
+        background: var(--panel);
+        color: var(--text);
+        border-radius: 10px;
+        padding: 10px 14px;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: 0.15s ease;
+      }
+
+      button:hover,
+      .file-btn:hover {
+        background: var(--panel-2);
+      }
+
+      button:disabled,
+      .file-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      button.primary {
+        background: var(--accent);
+        border-color: transparent;
+        color: #fff;
+        font-weight: 600;
+      }
+
+      button.primary:hover {
+        filter: brightness(1.08);
+      }
+
+      button.danger {
+        color: var(--danger);
+      }
+
+      .file-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .file-btn input {
+        display: none;
+      }
+
+      .status {
+        min-height: 1.2em;
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+
+      .status.ok {
+        color: var(--accent-2);
+      }
+
+      .status.err {
+        color: var(--danger);
+      }
+
+      .chat {
+        flex: 1;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        padding: 16px;
+        overflow-y: auto;
+        min-height: 420px;
+        max-height: calc(100vh - 240px);
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .empty {
+        margin: auto;
+        text-align: center;
+        color: var(--muted);
+        max-width: 360px;
+        line-height: 1.5;
+      }
+
+      .bubble {
+        max-width: 85%;
+        padding: 12px 14px;
+        border-radius: 16px;
+        line-height: 1.45;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      .bubble.user {
+        align-self: flex-end;
+        background: var(--user);
+        border-bottom-right-radius: 6px;
+      }
+
+      .bubble.bot {
+        align-self: flex-start;
+        background: var(--bot);
+        border: 1px solid var(--border);
+        border-bottom-left-radius: 6px;
+      }
+
+      .bubble .meta {
+        margin-top: 8px;
+        font-size: 0.75rem;
+        color: var(--muted);
+      }
+
+      .sources {
+        margin-top: 10px;
+        display: grid;
+        gap: 8px;
+      }
+
+      details.source {
+        background: #0f1724;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 8px 10px;
+      }
+
+      details.source summary {
+        cursor: pointer;
+        color: var(--accent-2);
+        font-size: 0.85rem;
+        list-style: none;
+      }
+
+      details.source summary::-webkit-details-marker {
+        display: none;
+      }
+
+      details.source pre {
+        margin: 8px 0 0;
+        white-space: pre-wrap;
+        color: var(--muted);
+        font-size: 0.8rem;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+
+      .composer {
+        display: flex;
+        gap: 8px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 10px;
+        box-shadow: var(--shadow);
+      }
+
+      .composer input {
+        flex: 1;
+        background: transparent;
+        border: 0;
+        outline: none;
+        color: var(--text);
+        font-size: 1rem;
+        padding: 8px 10px;
+      }
+
+      .composer input::placeholder {
+        color: var(--muted);
+      }
+
+      .typing {
+        display: inline-flex;
+        gap: 4px;
+        align-items: center;
+      }
+
+      .typing span {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--muted);
+        animation: bounce 1s infinite ease-in-out;
+      }
+
+      .typing span:nth-child(2) {
+        animation-delay: 0.15s;
+      }
+
+      .typing span:nth-child(3) {
+        animation-delay: 0.3s;
+      }
+
+      @keyframes bounce {
+        0%,
+        80%,
+        100% {
+          transform: translateY(0);
+          opacity: 0.4;
+        }
+        40% {
+          transform: translateY(-4px);
+          opacity: 1;
+        }
+      }
+
+      @media (max-width: 640px) {
+        header {
+          flex-direction: column;
+        }
+        .bubble {
+          max-width: 95%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header>
+        <div>
+          <h1>AI Knowledge Engine</h1>
+          <p class="subtitle">
+            Upload a PDF/TXT, ask a question — answers come only from your documents.
+          </p>
+        </div>
+        <div class="toolbar">
+          <label class="file-btn">
+            Upload file
+            <input id="file" type="file" accept=".pdf,.txt,text/plain,application/pdf" />
+          </label>
+          <button id="wipe" class="danger" type="button" title="Delete all documents">
+            Wipe data
+          </button>
+        </div>
+      </header>
+
+      <div id="status" class="status">Ready. Upload a document to begin.</div>
+
+      <main id="chat" class="chat">
+        <div class="empty" id="empty">
+          Tip: upload <code>demo/ai-knowledge-engine-handbook.pdf</code>, then ask
+          “What embedding model does this project use?”
+        </div>
+      </main>
+
+      <form id="composer" class="composer">
+        <input
+          id="question"
+          type="text"
+          placeholder="Ask a question about your documents…"
+          autocomplete="off"
+          required
+        />
+        <button class="primary" type="submit" id="ask">Ask</button>
+      </form>
+    </div>
+
+    <script>
+      const chat = document.getElementById('chat');
+      const empty = document.getElementById('empty');
+      const statusEl = document.getElementById('status');
+      const fileInput = document.getElementById('file');
+      const wipeBtn = document.getElementById('wipe');
+      const form = document.getElementById('composer');
+      const questionInput = document.getElementById('question');
+      const askBtn = document.getElementById('ask');
+
+      function setStatus(text, kind = '') {
+        statusEl.textContent = text;
+        statusEl.className = 'status' + (kind ? ' ' + kind : '');
+      }
+
+      function clearEmpty() {
+        if (empty) empty.remove();
+      }
+
+      function addBubble(role, html) {
+        clearEmpty();
+        const div = document.createElement('div');
+        div.className = 'bubble ' + role;
+        div.innerHTML = html;
+        chat.appendChild(div);
+        chat.scrollTop = chat.scrollHeight;
+        return div;
+      }
+
+      function escapeHtml(value) {
+        return String(value)
+          .replaceAll('&', '&amp;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;')
+          .replaceAll('"', '&quot;');
+      }
+
+      function renderSources(sources) {
+        if (!sources || sources.length === 0) return '';
+        const items = sources
+          .map((s, i) => {
+            const score =
+              typeof s.score === 'number' ? s.score.toFixed(3) : '?';
+            return (
+              '<details class="source">' +
+              '<summary>Source ' +
+              (i + 1) +
+              ' · ' +
+              escapeHtml(s.title || 'Untitled') +
+              ' · score ' +
+              score +
+              '</summary>' +
+              '<pre>' +
+              escapeHtml(s.content || '') +
+              '</pre>' +
+              '</details>'
+            );
+          })
+          .join('');
+        return '<div class="sources">' + items + '</div>';
+      }
+
+      function setBusy(busy) {
+        askBtn.disabled = busy;
+        fileInput.disabled = busy;
+        wipeBtn.disabled = busy;
+        questionInput.disabled = busy;
+      }
+
+      fileInput.addEventListener('change', async () => {
+        const file = fileInput.files && fileInput.files[0];
+        if (!file) return;
+
+        setBusy(true);
+        setStatus('Uploading “' + file.name + '”…');
+        addBubble('user', 'Upload: <strong>' + escapeHtml(file.name) + '</strong>');
+
+        const body = new FormData();
+        body.append('file', file);
+        body.append('title', file.name);
+
+        try {
+          const res = await fetch('/documents/upload', {
+            method: 'POST',
+            body,
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.message || 'Upload failed');
+
+          const msg =
+            data.duplicate
+              ? 'Already stored (duplicate). Reusing existing document.'
+              : 'Stored · ' +
+                data.chunkCount +
+                ' chunk' +
+                (data.chunkCount === 1 ? '' : 's') +
+                ' · ' +
+                (data.sourceType || 'file');
+
+          addBubble(
+            'bot',
+            escapeHtml(msg) +
+              '<div class="meta">id: ' +
+              escapeHtml(data.id) +
+              '</div>',
+          );
+          setStatus(
+            data.duplicate
+              ? 'Duplicate — nothing re-embedded.'
+              : 'Document ready. Ask a question.',
+            'ok',
+          );
+        } catch (err) {
+          addBubble('bot', 'Upload failed: ' + escapeHtml(err.message));
+          setStatus(err.message, 'err');
+        } finally {
+          fileInput.value = '';
+          setBusy(false);
+        }
+      });
+
+      wipeBtn.addEventListener('click', async () => {
+        if (!confirm('Delete ALL documents and chunks?')) return;
+        setBusy(true);
+        setStatus('Wiping…');
+        try {
+          const res = await fetch('/documents', { method: 'DELETE' });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.message || 'Wipe failed');
+          addBubble(
+            'bot',
+            'Wiped ' +
+              data.deletedDocuments +
+              ' document(s) and ' +
+              data.deletedChunks +
+              ' chunk(s).',
+          );
+          setStatus('Data cleared. Upload a new document.', 'ok');
+        } catch (err) {
+          addBubble('bot', 'Wipe failed: ' + escapeHtml(err.message));
+          setStatus(err.message, 'err');
+        } finally {
+          setBusy(false);
+        }
+      });
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const question = questionInput.value.trim();
+        if (!question) return;
+
+        addBubble('user', escapeHtml(question));
+        questionInput.value = '';
+        setBusy(true);
+        setStatus('Thinking…');
+
+        const thinking = addBubble(
+          'bot',
+          '<span class="typing"><span></span><span></span><span></span></span>',
+        );
+
+        try {
+          const res = await fetch('/query', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: question }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.message || 'Query failed');
+
+          thinking.innerHTML =
+            escapeHtml(data.answer || '(empty answer)') +
+            renderSources(data.sources) +
+            '<div class="meta">' +
+            escapeHtml(data.provider || '') +
+            ' · ' +
+            escapeHtml(data.model || '') +
+            (data.grounded ? ' · grounded' : ' · no context') +
+            '</div>';
+
+          setStatus(
+            data.grounded
+              ? 'Answered from your documents.'
+              : 'No matching context found.',
+            data.grounded ? 'ok' : '',
+          );
+        } catch (err) {
+          thinking.textContent = 'Error: ' + err.message;
+          setStatus(err.message, 'err');
+        } finally {
+          setBusy(false);
+          questionInput.focus();
+          chat.scrollTop = chat.scrollHeight;
+        }
+      });
+
+      questionInput.focus();
+    </script>
+  </body>
+</html>

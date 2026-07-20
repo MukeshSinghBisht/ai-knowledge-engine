@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
+import { ServeStaticModule } from '@nestjs/serve-static';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { join } from 'node:path';
 import { ChatModule } from './chat/chat.module';
 import { DocumentsModule } from './documents/documents.module';
 import { DocumentChunkEntity } from './documents/entities/document-chunk.entity';
@@ -51,6 +53,11 @@ import { QueryModule } from './query/query.module';
     ChatModule,
     DocumentsModule,
     QueryModule,
+    // Serve the minimal chat UI from /public as the site root.
+    // Keep this LAST so Nest controllers (/query, /documents, ...) win over static files.
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname, '..', 'public'),
+    }),
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

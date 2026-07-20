@@ -12,6 +12,10 @@ See [docs/BRD.md](./docs/BRD.md) for the full phased requirements.
 
 ## Demo
 
+Open the built-in chat UI at **http://localhost:3000/** (upload a PDF/TXT, ask a question, see answer + sources).
+
+Swagger: **http://localhost:3000/docs** · Full walkthrough: [demo/README.md](./demo/README.md).
+
 <!--
   RECORD A ~60-90s clip of the flow, then embed it here. Two options:
 
@@ -27,7 +31,7 @@ See [docs/BRD.md](./docs/BRD.md) for the full phased requirements.
 
 <!-- ![Demo](./demo/demo.gif) -->
 
-_Demo video coming soon._ Full step-by-step walkthrough: [demo/README.md](./demo/README.md).
+_Demo video coming soon._
 
 ## Prerequisites
 

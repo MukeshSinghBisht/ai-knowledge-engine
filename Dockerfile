@@ -17,6 +17,7 @@ COPY package*.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
 COPY --from=build /app/dist ./dist
+COPY --from=build /app/public ./public
 
 # Hosts (Render/Railway) inject PORT; the app reads process.env.PORT.
 EXPOSE 3000

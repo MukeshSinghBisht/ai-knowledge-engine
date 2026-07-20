@@ -20,11 +20,12 @@ ollama pull nomic-embed-text
 # 2. Postgres + pgvector
 docker compose up -d
 
-# 3. The API
+# 3. The API (+ the chat UI)
 node dist/main.js        # or: npm run start:dev
 ```
 
-Open **http://localhost:3000/docs** — this is the screen you'll present from.
+Open **http://localhost:3000/** — this is the chat UI you'll present from
+(upload → ask → answer with sources). Swagger at `/docs` is still available if you prefer.
 
 > Tip: for the crispest answers, set `LLM_PROVIDER=gemini` in `.env` (needs an API key).
 > The local `llama3.2` works offline but is a bit more verbose.
