@@ -5,10 +5,14 @@ NestJS API with switchable **Ollama**, **Google Gemini**, or **OpenAI** provider
 - **Phase 1:** chat, structured output, tool/function calling
 - **Phase 2 (Week 3):** pgvector semantic search — store documents (chunk + embed) and search by meaning
 - **Phase 3:** RAG `/query` (retrieve + answer grounded in sources) and file upload (`.txt`/`.pdf`) with duplicate detection
+- **Next — Phase 4: AI Gateway** — cost & latency telemetry, automatic provider fallback, per-user rate limits, cost summary API
 
-Later phases add async ingestion, Redis caching, streaming, and multi-tenant auth.
+After that: async ingestion (BullMQ), SSE streaming, JWT multi-tenant auth.
 
-See [docs/BRD.md](./docs/BRD.md) for the full phased requirements.
+**Parallel (interview only, not a product phase):** light React refresh inside this chat UI —
+hooks + patterns, not a frontend rewrite. See [docs/react-interview-prep.md](./docs/react-interview-prep.md).
+
+See [docs/BRD.md](./docs/BRD.md) for requirements and [docs/ai-gateway-plan.md](./docs/ai-gateway-plan.md) for the gateway build plan.
 
 ## Demo
 
@@ -252,8 +256,10 @@ src/
   query/      POST /query (RAG: retrieve + generate)
   health/     GET /health
   llm/        Ollama + Gemini + OpenAI providers, tools/, embeddings
+  gateway/    (planned) single entry for LLM calls — cost, fallback, rate limits
 db/
   init.sql    pgvector extension + schema + HNSW index
+              (planned) llm_gateway_logs
 demo/
   README.md               step-by-step demo runbook
   demo.gif                inline README preview (~2.7 MB)
@@ -264,10 +270,26 @@ demo/
 docker-compose.yml   Postgres 16 + pgvector
 docs/
   BRD.md
+  ai-gateway-plan.md   next phase: telemetry, fallback, rate limits, cost summary
+  react-interview-prep.md   light React refresh via this chat UI (not a FE project)
   ollama-setup.md
   gemini-setup.md
   llm-provider-comparison.md
 ```
+
+## Future — AI Gateway (Phase 4)
+
+All LLM calls go through one gateway instead of hitting providers directly.
+
+| Slice | What it adds |
+|-------|----------------|
+| **4.1 Telemetry** | Cost table (OpenAI/Gemini; Ollama = $0 + compute time), log tokens/cost/latency/`requestId` in `llm_gateway_logs` |
+| **4.2 Fallback** | Ordered retry (e.g. OpenAI → Gemini → Ollama), timeout, max attempts, log primary vs fallback |
+| **4.3 Rate limit** | Redis counter per user/API key; **429** when over X req/min |
+| **4.4 Summary API** | `GET /gateway/summary` — cost today, by provider, avg latency (JSON only) |
+| **4.5 Positioning** | README + short demo + resume line: *AI Gateway / LLM cost & telemetry management* |
+
+**4.1 alone is demoable.** Full plan: [docs/ai-gateway-plan.md](./docs/ai-gateway-plan.md).
 
 ## Live walkthrough
 

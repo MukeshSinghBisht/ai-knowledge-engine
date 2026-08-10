@@ -47,6 +47,13 @@ OPENAI_CHAT_MODEL=gpt-4o-mini
 
 ---
 
+## Next: AI Gateway
+
+Providers stay the same. The next phase wraps them in one gateway: cost table
+(OpenAI/Gemini; Ollama = $0), fallback order, rate limits, `llm_gateway_logs`.
+
+See [ai-gateway-plan.md](./ai-gateway-plan.md).
+
 ## Related
 
 - [Gemini setup](./gemini-setup.md)

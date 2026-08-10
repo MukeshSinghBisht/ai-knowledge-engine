@@ -12,8 +12,8 @@
 | Project | AI Knowledge Engine (`ai-knowledge-engine`) |
 | Author | Mukesh Bisht |
 | Status | Living document — updated per phase |
-| Version | 0.6 (Phase 3: RAG `/query` + file upload/dedup + wipe endpoint; demo runbook added) |
-| Related | `ai-backend-engineer-roadmap/ROADMAP.md`, `ROADMAP` CHECKLIST, `docs/interview-notes.md` |
+| Version | 0.8 (Phase 3 done; next = AI Gateway; parallel light React interview refresh via chat UI) |
+| Related | `ai-backend-engineer-roadmap/ROADMAP.md`, `ROADMAP` CHECKLIST, `docs/interview-notes.md`, `docs/ai-gateway-plan.md`, `docs/react-interview-prep.md` |
 
 **How to use this doc:** Before building a feature, open the matching requirement
 section (e.g. Week 3 work → §7.3 Retrieval). Each functional requirement has an ID,
@@ -54,6 +54,7 @@ citations, tenant isolation, and production-grade ingestion/caching.
 | OBJ-3 | Ingest large documents asynchronously without blocking the API. |
 | OBJ-4 | Stream answers for a responsive UX. |
 | OBJ-5 | Be demonstrable and explainable (README, diagram, demo video, interview notes). |
+| OBJ-6 | Route all LLM calls through an AI Gateway: cost/latency telemetry, fallback, rate limits. |
 
 ### 3.4 Non-goals
 Training/fine-tuning models, building a full frontend product, non-text media (audio/
@@ -79,15 +80,18 @@ image) understanding, and real-time collaborative editing are **out of scope**.
 - Provider-agnostic LLM layer (Ollama / Gemini / OpenAI).
 - Chat, structured extraction, RAG query, semantic search.
 - PDF/TXT ingestion with chunking + embeddings in pgvector.
-- Async ingestion (BullMQ + Redis), response caching, rate limiting.
+- **AI Gateway:** cost/latency telemetry, automatic provider fallback, per-user rate limits, cost summary API.
+- Async ingestion (BullMQ + Redis), response caching.
 - SSE streaming responses.
 - JWT auth, multi-tenant isolation, audit logging.
 
 ### 5.2 Out of scope (v1)
 - Fine-tuning / training models.
 - Non-text documents (images, audio, video).
-- Full production frontend (a minimal demo web client is optional in Phase 5).
-- Enterprise SSO/SAML, billing, admin dashboards.
+- Full production frontend / becoming a frontend specialist.
+- A **light React refresh** of the existing chat UI is in scope for **interview credibility only** (see `docs/react-interview-prep.md`) — not a product phase.
+- Enterprise SSO/SAML, a full billing product, or a multi-cloud router SaaS.
+- Admin UI for the cost dashboard (JSON API only for gateway v1).
 
 ### 5.3 Assumptions
 - Local dev uses **Ollama** (free) by default; cloud providers are swappable via config.
@@ -98,7 +102,9 @@ image) understanding, and real-time collaborative editing are **out of scope**.
 ### 5.4 Constraints
 - Part-time build (~14–16 hrs/week); **cut scope, not interview prep** if behind.
 - Never skip the three signature capabilities: multi-tenant, async queue, streaming.
-- API costs controlled via small dev docs + caching (Phase 4).
+- Next slice after RAG is **AI Gateway** (telemetry first). Do not start BullMQ until Gateway Phase 1 is demoable, unless you explicitly skip.
+- React interview prep is **parallel** (30 min slots). Do not pause gateway work for a React rewrite.
+- API costs controlled via local Ollama, small docs, gateway logs, then caching.
 
 ---
 
@@ -117,14 +123,17 @@ Query:   question -> embed -> vector search top-k -> build context
 | API | HTTP endpoints, validation, auth | NestJS controllers + DTOs |
 | Service | Orchestration (RAG, ingestion) | NestJS services |
 | LLM | Provider-agnostic chat/embeddings | `LlmService` + providers |
+| AI Gateway | Single entry for LLM calls: cost, fallback, rate limit | `GatewayService` → providers |
 | Vector store | Chunks + embeddings + search | Postgres + pgvector |
-| Queue | Async ingestion jobs | BullMQ + Redis |
-| Cache | LLM/response caching | Redis |
+| Telemetry | Per-call cost/latency logs | `llm_gateway_logs` |
+| Queue | Async ingestion jobs | BullMQ + Redis (after gateway) |
+| Cache / rate limit | Counters + later response cache | Redis |
 | Auth | JWT, tenant scoping | `@nestjs/jwt`, guards |
 | Audit | Track key actions | `audit_events` table |
 
 ### 6.3 Design principles
 - **Provider-agnostic:** all providers implement one interface; swap via `LLM_PROVIDER`.
+- **Gateway owns production LLM concerns:** cost, latency, fallback, and rate limits — not each controller.
 - **Backend owns retrieval:** the LLM reads context we give it (basic RAG is not agentic).
 - **Validate in and out:** DTO validation on input; validate/normalize LLM output.
 - **Fail safe:** guard external loops (max rounds/retries); clear error codes.
@@ -178,9 +187,24 @@ Query:   question -> embed -> vector search top-k -> build context
 | FR-GEN-01 | M | `POST /query` retrieves context then answers | **DONE.** Retrieves top-k (default 4), stuffs chunks into a grounded prompt, LLM answers. |
 | FR-GEN-02 | M | Answer includes source citations | **DONE.** Returns `sources[]` (chunkId, documentId, title, chunkIndex, content, score) + `grounded` flag. |
 | FR-GEN-03 | M | "Don't know" behavior | **DONE.** System prompt forbids outside knowledge; verified returns "I don't know based on the available documents." |
-| FR-GEN-04 | S | Log prompt, chunks used, latency | Pending — Phase 4 observability. |
+| FR-GEN-04 | S | Log prompt, chunks used, latency | **Moved to AI Gateway** (FR-GW-01..03). |
 
-### 7.6 Production engineering (Phase 4, Week 7–8)
+### 7.6 AI Gateway (Phase 4 — next)
+| ID | Priority | Requirement | Acceptance criteria |
+|----|----------|-------------|---------------------|
+| FR-GW-01 | M | All LLM calls go through one gateway function | Chat, query, and embed do not call providers directly |
+| FR-GW-02 | M | Per-provider cost table | OpenAI + Gemini: input/output $/token; Ollama cost = 0, log compute time |
+| FR-GW-03 | M | Persist every call to `llm_gateway_logs` | provider, input/output tokens, cost, latency, timestamp, `requestId` |
+| FR-GW-04 | M | `requestId` traces back to the user query | Same id on `/query` (or `/chat`) response and log row(s) |
+| FR-GW-05 | M | Configurable fallback order + timeout | e.g. OpenAI → Gemini → Ollama; default timeout ~10s |
+| FR-GW-06 | M | On timeout/error, try next provider | Max attempts; stop when all fail; no infinite loop |
+| FR-GW-07 | M | Log primary vs fallback + failure reason | Log row shows which attempt succeeded and why previous failed |
+| FR-GW-08 | M | Per-user or API-key rate limit (Redis) | Over limit → **429** with a clear body (not a silent fail) |
+| FR-GW-09 | M | `GET /gateway/summary` cost/latency JSON | Today total cost, cost by provider, avg latency by provider |
+| FR-GW-10 | C | Summary broken down by user/tenant | Optional once FR-GW-08 (or Phase 7 tenant) exists |
+| FR-GW-11 | S | README + short demo of fallback + summary | Resume line: *AI Gateway / LLM cost & telemetry management* |
+
+### 7.7 Production engineering (Phase 5 — after gateway)
 | ID | Priority | Requirement | Acceptance criteria |
 |----|----------|-------------|---------------------|
 | FR-JOB-01 | M | Async ingestion via BullMQ queue + worker | Upload enqueues job; worker processes |
@@ -189,16 +213,15 @@ Query:   question -> embed -> vector search top-k -> build context
 | FR-JOB-04 | S | Retry with backoff on failure | Job survives worker restart |
 | FR-CACHE-01 | S | Cache LLM responses (exact match) | Hash(prompt+context) hit returns cached answer |
 | FR-CACHE-02 | C | Semantic cache | Similar query above threshold returns cached answer |
-| FR-RATE-01 | S | Per-user rate limiting | Requests over limit → 429 |
 
-### 7.7 Streaming (Phase 5, Week 9–10)
+### 7.8 Streaming (Phase 6)
 | ID | Priority | Requirement | Acceptance criteria |
 |----|----------|-------------|---------------------|
 | FR-STR-01 | M | SSE streaming chat endpoint | Tokens flushed incrementally |
 | FR-STR-02 | M | Streaming RAG (sources then streamed answer) | Sources sent first, answer streamed |
 | FR-STR-03 | C | Minimal web client | EventSource demo (optional) |
 
-### 7.8 Enterprise / multi-tenant (Phase 6, Week 11–12)
+### 7.9 Enterprise / multi-tenant (Phase 7)
 | ID | Priority | Requirement | Acceptance criteria |
 |----|----------|-------------|---------------------|
 | FR-AUTH-01 | M | JWT register/login | Token issued; protected routes require it |
@@ -220,9 +243,9 @@ Query:   question -> embed -> vector search top-k -> build context
 | NFR-REL-01 | Reliability | Ingestion survives worker restart (BullMQ retry/backoff) |
 | NFR-SEC-01 | Security | Secrets only in env; no secrets committed; JWT-protected routes |
 | NFR-SEC-02 | Security | Tenant isolation enforced at the data-access layer, not just UI |
-| NFR-OBS-01 | Observability | Structured logs for prompts, chunks used, latency, job outcomes |
+| NFR-OBS-01 | Observability | Structured gateway logs: provider, tokens, cost, latency, requestId, fallback reason |
 | NFR-MAINT-01 | Maintainability | Provider-agnostic interfaces; DTO validation; typed contracts |
-| NFR-COST-01 | Cost | Caching + small dev docs to control LLM API spend |
+| NFR-COST-01 | Cost | Gateway cost table + summary API; small dev docs; later caching |
 | NFR-PORT-01 | Portability | `docker compose up` brings up the full stack locally |
 | NFR-DOC-01 | Documentation | README + architecture diagram + interview notes kept current |
 
@@ -262,10 +285,26 @@ Set via `OLLAMA_EMBEDDING_MODEL` in `.env`; column is `embedding vector(768)` in
 `db/init.sql`. Switching to e.g. OpenAI `text-embedding-3-small` (1536) means a new
 column dimension and a full re-embed.
 
-### 9.4 `jobs` (or BullMQ-managed) — Phase 4
+### 9.4 `llm_gateway_logs` — Phase 4 (AI Gateway)
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid PK | |
+| request_id | text | traces to the original `/chat` or `/query` |
+| provider | text | `ollama` \| `gemini` \| `openai` |
+| attempt | int | 1 = primary; >1 = fallback |
+| outcome | text | `success` \| `timeout` \| `error` |
+| failure_reason | text | nullable |
+| input_tokens | int | |
+| output_tokens | int | |
+| cost_usd | numeric | 0 for Ollama |
+| latency_ms | int | wall-clock for this attempt |
+| compute_ms | int | Ollama-focused; optional for cloud |
+| created_at | timestamptz | |
+
+### 9.5 `jobs` (or BullMQ-managed) — Phase 5
 Track ingestion job id, status, document reference, error, timestamps.
 
-### 9.5 `audit_events` — Phase 6
+### 9.6 `audit_events` — Phase 7
 | Column | Type | Notes |
 |--------|------|-------|
 | id | uuid PK | |
@@ -291,9 +330,10 @@ Track ingestion job id, status, document reference, error, timestamps.
 | DELETE | `/documents` | — | 3 | Done (wipe all — demo/dev reset utility) |
 | POST | `/search` | FR-RAG-02..04 | 2 | Done (top-k cosine) |
 | POST | `/query` | FR-GEN-01..04 | 3 | Done (grounded RAG answer + sources) |
-| GET | `/jobs/:id` | FR-JOB-03 | 4 | Planned |
-| POST | `/chat/stream` | FR-STR-01 | 5 | Planned |
-| POST | `/auth/register`, `/auth/login` | FR-AUTH-01 | 6 | Planned |
+| GET | `/gateway/summary` | FR-GW-09..10 | 4 | Planned |
+| GET | `/jobs/:id` | FR-JOB-03 | 5 | Planned |
+| POST | `/chat/stream` | FR-STR-01 | 6 | Planned |
+| POST | `/auth/register`, `/auth/login` | FR-AUTH-01 | 7 | Planned |
 
 Contracts follow existing conventions: JSON in/out, DTO validation, Swagger-documented,
 `ServiceUnavailable` (503) for provider/config errors, `BadGateway` (502) for invalid
@@ -309,16 +349,18 @@ LLM output, `BadRequest` (400) for input validation.
 | 1 | Demo `curl` chat + structured metadata in README ✅ |
 | 2 | Semantic search returns top-k with scores (retrieval only) ✅ (Week 3; Week 4 adds files/async ingest) |
 | 3 | Upload doc → ask question → answer + sources ✅ (core RAG via `/query`; file upload in Wk4) |
-| 4 | Async ingestion; API non-blocking on upload |
-| 5 | Live streaming RAG demo |
-| 6 | JWT multi-tenant isolation test passes; audit log present; portfolio-ready |
+| 4 | AI Gateway: logs + cost; fallback demoable; 429 on rate limit; `GET /gateway/summary` |
+| 5 | Async ingestion; API non-blocking on upload |
+| 6 | Live streaming RAG demo |
+| 7 | JWT multi-tenant isolation test passes; audit log present; portfolio-ready |
 
 ### 11.2 Project-level success (Week 12)
 - Tenant A cannot read tenant B documents (automated test).
 - Ingestion survives worker restart.
 - p95 query latency logged.
 - README with architecture diagram + curl examples; 2-minute demo video.
-- Resume bullet + ability to whiteboard RAG + async ingest in ~15 min.
+- Resume bullet: RAG + **AI Gateway / LLM cost & telemetry management**.
+- Ability to whiteboard RAG + gateway fallback + async ingest in ~15 min.
 
 ---
 
@@ -328,7 +370,7 @@ LLM output, `BadRequest` (400) for input validation.
 |----|------|------------|
 | RSK-1 | Time slips (part-time) | Cut scope, never interview prep; one slice/week |
 | RSK-2 | Scope creep | One deliverable per phase; defer C-priority items |
-| RSK-3 | LLM API cost | Small dev docs, caching (Phase 4), local Ollama default |
+| RSK-3 | LLM API cost | Local Ollama default; gateway cost logs; later caching |
 | RSK-4 | Inconsistent LLM output | Validate + normalize output; retry (already done for metadata) |
 | RSK-5 | Embedding dimension mismatch | Lock model+dimension in config; re-embed on change |
 | RSK-6 | Tutorial trap (no real learning) | Every week must change the repo + add interview notes |
@@ -343,9 +385,10 @@ LLM output, `BadRequest` (400) for input validation.
 | 1 Foundations | 1–2 | Chat + structured output | FR-CHAT-* |
 | 2 pgvector | 3–4 | Storage + semantic search + text ingest | FR-DB-*, FR-RAG-*, FR-ING-01..03 |
 | 3 Full RAG | 5–6 | Upload → answer + citations | FR-ING-04, FR-GEN-* |
-| 4 Production | 7–8 | Async ingest, caching, rate limit | FR-JOB-*, FR-CACHE-*, FR-RATE-* |
-| 5 Streaming | 9–10 | SSE streaming RAG | FR-STR-* |
-| 6 Enterprise | 11–12 | JWT, multi-tenant, audit, polish | FR-AUTH-*, FR-TEN-*, FR-AUD-*, FR-SEC-*, FR-DOC-* |
+| 4 AI Gateway | next | Telemetry, fallback, rate limit, cost summary | FR-GW-* |
+| 5 Production | after GW | Async ingest, caching | FR-JOB-*, FR-CACHE-* |
+| 6 Streaming | after ingest | SSE streaming RAG | FR-STR-* |
+| 7 Enterprise | last | JWT, multi-tenant, audit, polish | FR-AUTH-*, FR-TEN-*, FR-AUD-*, FR-SEC-*, FR-DOC-* |
 
 ---
 
@@ -362,6 +405,7 @@ LLM output, `BadRequest` (400) for input validation.
 | **Tool calling** | LLM requests that the backend run a function, then continues with the result |
 | **Agentic RAG** | RAG where the model decides when/what to retrieve via tools (beyond basic RAG) |
 | **Multi-tenant** | One system serving isolated tenants; tenant A can't see tenant B data |
+| **AI Gateway** | Single layer over LLM providers: routing, fallback, cost/latency logs, rate limits |
 | **SSE** | Server-Sent Events: one-way server→client streaming over HTTP |
 | **Idempotency** | Repeating an operation (e.g. re-upload) has no additional effect |
 
