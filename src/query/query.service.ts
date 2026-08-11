@@ -1,6 +1,11 @@
 import { Injectable } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { DocumentsService } from '../documents/documents.service';
 import { SearchResultDto } from '../documents/dto/document-response.dto';
+import {
+  RETRIEVAL_MODE_TOP_K,
+  RetrievalMode,
+} from '../gateway/retrieval-mode';
 import { LlmService } from '../llm/llm.service';
 import { QueryDto } from './dto/query.dto';
 import { QueryResponseDto } from './dto/query-response.dto';
@@ -30,13 +35,25 @@ export class QueryService {
   ) {}
 
   async answer(dto: QueryDto): Promise<QueryResponseDto> {
-    const topK = dto.topK ?? 4;
+    const requestId = randomUUID();
+    const mode = dto.mode ?? null;
+    const topK =
+      dto.topK ??
+      (mode ? RETRIEVAL_MODE_TOP_K[mode] : 4);
+    const callOptions = {
+      requestId,
+      retrievalMode: mode ?? undefined,
+      topK,
+    };
 
     // 1. Retrieve: reuse the same embedding + cosine search as /search.
-    const { results } = await this.documentsService.search({
-      query: dto.query,
-      topK,
-    });
+    const { results } = await this.documentsService.search(
+      {
+        query: dto.query,
+        topK,
+      },
+      callOptions,
+    );
 
     // 2. No context found → don't call the LLM; there's nothing to ground on.
     if (results.length === 0) {
@@ -47,6 +64,11 @@ export class QueryService {
         model: '-',
         provider: this.llmService.activeProvider,
         usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+        requestId,
+        costUsd: 0,
+        latencyMs: 0,
+        mode,
+        topK,
       };
     }
 
@@ -59,13 +81,16 @@ export class QueryService {
       .join('\n\n');
 
     // 4. Generate: the LLM answers grounded in that context.
-    const result = await this.llmService.chat([
-      { role: 'system', content: SYSTEM_PROMPT },
-      {
-        role: 'user',
-        content: `Context:\n${context}\n\nQuestion: ${dto.query}`,
-      },
-    ]);
+    const result = await this.llmService.chat(
+      [
+        { role: 'system', content: SYSTEM_PROMPT },
+        {
+          role: 'user',
+          content: `Context:\n${context}\n\nQuestion: ${dto.query}`,
+        },
+      ],
+      callOptions,
+    );
 
     return {
       answer: result.reply,
@@ -74,6 +99,11 @@ export class QueryService {
       model: result.model,
       provider: result.provider,
       usage: result.usage,
+      requestId: result.requestId,
+      costUsd: result.costUsd,
+      latencyMs: result.latencyMs,
+      mode,
+      topK,
     };
   }
 }

@@ -1,6 +1,7 @@
 # Ollama setup (local, free)
 
-Use **Ollama** for $0 development — chat now, embeddings in Week 3+ for RAG.
+Use **Ollama** for free local development — chat now, embeddings for RAG.
+Gateway `costUsd` still uses demo `OLLAMA_*_USD_PER_1M` rates (same pattern as OpenAI/Gemini).
 
 ## 1. Install Ollama
 

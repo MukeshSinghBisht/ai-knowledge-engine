@@ -12,7 +12,7 @@
 | Project | AI Knowledge Engine (`ai-knowledge-engine`) |
 | Author | Mukesh Bisht |
 | Status | Living document — updated per phase |
-| Version | 0.8 (Phase 3 done; next = AI Gateway; parallel light React interview refresh via chat UI) |
+| Version | 0.9 (Gateway 4.1 telemetry done — config rates + llm_gateway_logs + requestId on /chat and /query) |
 | Related | `ai-backend-engineer-roadmap/ROADMAP.md`, `ROADMAP` CHECKLIST, `docs/interview-notes.md`, `docs/ai-gateway-plan.md`, `docs/react-interview-prep.md` |
 
 **How to use this doc:** Before building a feature, open the matching requirement
@@ -192,10 +192,10 @@ Query:   question -> embed -> vector search top-k -> build context
 ### 7.6 AI Gateway (Phase 4 — next)
 | ID | Priority | Requirement | Acceptance criteria |
 |----|----------|-------------|---------------------|
-| FR-GW-01 | M | All LLM calls go through one gateway function | Chat, query, and embed do not call providers directly |
-| FR-GW-02 | M | Per-provider cost table | OpenAI + Gemini: input/output $/token; Ollama cost = 0, log compute time |
-| FR-GW-03 | M | Persist every call to `llm_gateway_logs` | provider, input/output tokens, cost, latency, timestamp, `requestId` |
-| FR-GW-04 | M | `requestId` traces back to the user query | Same id on `/query` (or `/chat`) response and log row(s) |
+| FR-GW-01 | M | All LLM calls go through one gateway function | **DONE.** `LlmService` instruments generate/tools/embed; providers are not called from controllers. |
+| FR-GW-02 | M | Per-provider cost table | **DONE.** Config rates (`OLLAMA_*` / `OPENAI_*` / `GEMINI_*_USD_PER_1M`); Ollama rates are demo assumptions. |
+| FR-GW-03 | M | Persist every call to `llm_gateway_logs` | **DONE.** provider, tokens, cost, latency, timestamp, `requestId`. |
+| FR-GW-04 | M | `requestId` traces back to the user query | **DONE.** Same id on `/query` (or `/chat`) response and log row(s); `/query` shares id across embed + generate. |
 | FR-GW-05 | M | Configurable fallback order + timeout | e.g. OpenAI → Gemini → Ollama; default timeout ~10s |
 | FR-GW-06 | M | On timeout/error, try next provider | Max attempts; stop when all fail; no infinite loop |
 | FR-GW-07 | M | Log primary vs fallback + failure reason | Log row shows which attempt succeeded and why previous failed |
@@ -290,13 +290,17 @@ column dimension and a full re-embed.
 |--------|------|-------|
 | id | uuid PK | |
 | request_id | text | traces to the original `/chat` or `/query` |
+| operation | enum `llm_gateway_operation` | `generate` \| `tools` \| `embed` (`generate` covers `/chat` + `/chat/structured`) |
+| retrieval_mode | enum `llm_retrieval_mode` nullable | `simple` \| `thorough` (RAG UI depth; null for non-query calls) |
+| top_k | int nullable | chunks retrieved for this query; null for non-query calls |
 | provider | text | `ollama` \| `gemini` \| `openai` |
+| model | text | provider model id |
 | attempt | int | 1 = primary; >1 = fallback |
 | outcome | text | `success` \| `timeout` \| `error` |
 | failure_reason | text | nullable |
 | input_tokens | int | |
 | output_tokens | int | |
-| cost_usd | numeric | 0 for Ollama |
+| cost_usd | numeric | tokens × provider `*_USD_PER_1M` (Ollama rates are demo assumptions) |
 | latency_ms | int | wall-clock for this attempt |
 | compute_ms | int | Ollama-focused; optional for cloud |
 | created_at | timestamptz | |
@@ -322,14 +326,14 @@ Track ingestion job id, status, document reference, error, timestamps.
 | Method | Path | Requirement | Phase | Status |
 |--------|------|-------------|-------|--------|
 | GET | `/health` | — | 1 | Done |
-| POST | `/chat` | FR-CHAT-01..03 | 1 | Done |
+| POST | `/chat` | FR-CHAT-01..03, FR-GW-01..04 | 1 + 4.1 | Done (+ requestId/cost/latency) |
 | POST | `/chat/structured` | FR-CHAT-04..06 | 2 | Done |
 | POST | `/chat/tools` | FR-TOOL-01 | 2 | Done (Ollama; others stubbed) |
 | POST | `/documents` | FR-ING-01..03,06 | 2–3 | Done (raw text + dedup) |
 | POST | `/documents/upload` | FR-ING-04..06 | 3 | Done (.txt/.pdf, max 10 MB, dedup) |
 | DELETE | `/documents` | — | 3 | Done (wipe all — demo/dev reset utility) |
 | POST | `/search` | FR-RAG-02..04 | 2 | Done (top-k cosine) |
-| POST | `/query` | FR-GEN-01..04 | 3 | Done (grounded RAG answer + sources) |
+| POST | `/query` | FR-GEN-01..04, FR-GW-01..04 | 3–4.1 | Done (RAG + requestId/cost/latency) |
 | GET | `/gateway/summary` | FR-GW-09..10 | 4 | Planned |
 | GET | `/jobs/:id` | FR-JOB-03 | 5 | Planned |
 | POST | `/chat/stream` | FR-STR-01 | 6 | Planned |
@@ -349,7 +353,7 @@ LLM output, `BadRequest` (400) for input validation.
 | 1 | Demo `curl` chat + structured metadata in README ✅ |
 | 2 | Semantic search returns top-k with scores (retrieval only) ✅ (Week 3; Week 4 adds files/async ingest) |
 | 3 | Upload doc → ask question → answer + sources ✅ (core RAG via `/query`; file upload in Wk4) |
-| 4 | AI Gateway: logs + cost; fallback demoable; 429 on rate limit; `GET /gateway/summary` |
+| 4 | 4.1 telemetry ✅; then fallback demoable; 429 on rate limit; `GET /gateway/summary` |
 | 5 | Async ingestion; API non-blocking on upload |
 | 6 | Live streaming RAG demo |
 | 7 | JWT multi-tenant isolation test passes; audit log present; portfolio-ready |

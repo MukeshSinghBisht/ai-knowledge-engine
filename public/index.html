@@ -227,6 +227,59 @@
         box-shadow: var(--shadow);
       }
 
+      .ask-bar {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .mode-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+        padding: 0 2px;
+      }
+
+      .mode-row .hint {
+        color: var(--muted);
+        font-size: 0.8rem;
+      }
+
+      .mode-toggle {
+        display: inline-flex;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        overflow: hidden;
+        background: var(--panel);
+      }
+
+      .mode-toggle label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 12px;
+        font-size: 0.85rem;
+        cursor: pointer;
+        color: var(--muted);
+        user-select: none;
+      }
+
+      .mode-toggle label + label {
+        border-left: 1px solid var(--border);
+      }
+
+      .mode-toggle input {
+        accent-color: var(--accent);
+      }
+
+      .mode-toggle label:has(input:checked) {
+        background: var(--panel-2);
+        color: var(--text);
+        font-weight: 600;
+      }
+
       .composer input {
         flex: 1;
         background: transparent;
@@ -310,21 +363,37 @@
 
       <main id="chat" class="chat">
         <div class="empty" id="empty">
-          Tip: upload <code>demo/ai-knowledge-engine-handbook.pdf</code>, then ask
-          “What embedding model does this project use?”
+          Tip: upload <code>demo/ai-knowledge-engine-handbook.pdf</code>, ask
+          “What embedding model does this project use?”, then compare
+          <strong>Simple</strong> vs <strong>Thorough</strong> cost under the answer.
         </div>
       </main>
 
-      <form id="composer" class="composer">
-        <input
-          id="question"
-          type="text"
-          placeholder="Ask a question about your documents…"
-          autocomplete="off"
-          required
-        />
-        <button class="primary" type="submit" id="ask">Ask</button>
-      </form>
+      <div class="ask-bar">
+        <div class="mode-row">
+          <div class="mode-toggle" role="radiogroup" aria-label="Research depth">
+            <label>
+              <input type="radio" name="mode" value="simple" checked />
+              Simple
+            </label>
+            <label>
+              <input type="radio" name="mode" value="thorough" />
+              Thorough
+            </label>
+          </div>
+          <span class="hint" id="modeHint">Simple uses 2 chunks · lower cost</span>
+        </div>
+        <form id="composer" class="composer">
+          <input
+            id="question"
+            type="text"
+            placeholder="Ask a question about your documents…"
+            autocomplete="off"
+            required
+          />
+          <button class="primary" type="submit" id="ask">Ask</button>
+        </form>
+      </div>
     </div>
 
     <script>
@@ -336,6 +405,33 @@
       const form = document.getElementById('composer');
       const questionInput = document.getElementById('question');
       const askBtn = document.getElementById('ask');
+      const modeHint = document.getElementById('modeHint');
+
+      const MODES = {
+        simple: {
+          key: 'simple',
+          topK: 2,
+          label: 'Simple',
+          hint: 'Simple uses 2 chunks · lower cost',
+        },
+        thorough: {
+          key: 'thorough',
+          topK: 12,
+          label: 'Thorough',
+          hint: 'Thorough uses 12 chunks · higher cost, more context',
+        },
+      };
+
+      function selectedMode() {
+        const checked = document.querySelector('input[name="mode"]:checked');
+        return MODES[checked && checked.value === 'thorough' ? 'thorough' : 'simple'];
+      }
+
+      document.querySelectorAll('input[name="mode"]').forEach((input) => {
+        input.addEventListener('change', () => {
+          modeHint.textContent = selectedMode().hint;
+        });
+      });
 
       function setStatus(text, kind = '') {
         statusEl.textContent = text;
@@ -489,10 +585,15 @@
         );
 
         try {
+          const mode = selectedMode();
           const res = await fetch('/query', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query: question }),
+            body: JSON.stringify({
+              query: question,
+              mode: mode.key,
+              topK: mode.topK,
+            }),
           });
           const data = await res.json();
           if (!res.ok) throw new Error(data.message || 'Query failed');
@@ -501,15 +602,28 @@
             escapeHtml(data.answer || '(empty answer)') +
             renderSources(data.sources) +
             '<div class="meta">' +
+            escapeHtml(mode.label) +
+            ' · topK ' +
+            mode.topK +
+            ' · ' +
             escapeHtml(data.provider || '') +
             ' · ' +
             escapeHtml(data.model || '') +
             (data.grounded ? ' · grounded' : ' · no context') +
+            (typeof data.latencyMs === 'number'
+              ? ' · ' + data.latencyMs + ' ms'
+              : '') +
+            (typeof data.costUsd === 'number'
+              ? ' · $' + Number(data.costUsd).toFixed(6)
+              : '') +
+            (data.requestId
+              ? '<br>requestId: ' + escapeHtml(data.requestId)
+              : '') +
             '</div>';
 
           setStatus(
             data.grounded
-              ? 'Answered from your documents.'
+              ? 'Answered from your documents (' + mode.label + ').'
               : 'No matching context found.',
             data.grounded ? 'ok' : '',
           );

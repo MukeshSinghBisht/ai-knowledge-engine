@@ -5,6 +5,8 @@ about **you** after you feed it your résumé. The "wow" moments are (1) it cite
 sources, (2) it refuses to answer what it doesn't know, and (3) it instantly becomes
 an expert on any document you give it — no code change.
 
+**Gateway / cost demo (Simple vs Thorough):** see [GATEWAY-COST-DEMO.md](./GATEWAY-COST-DEMO.md).
+
 ## Recorded demo
 
 ![AI Knowledge Engine demo](./demo.gif)

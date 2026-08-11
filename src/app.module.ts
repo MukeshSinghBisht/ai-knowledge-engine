@@ -9,6 +9,7 @@ import { ChatModule } from './chat/chat.module';
 import { DocumentsModule } from './documents/documents.module';
 import { DocumentChunkEntity } from './documents/entities/document-chunk.entity';
 import { DocumentEntity } from './documents/entities/document.entity';
+import { LlmGatewayLogEntity } from './gateway/entities/llm-gateway-log.entity';
 import { HealthModule } from './health/health.module';
 import { LlmModule } from './llm/llm.module';
 import { QueryModule } from './query/query.module';
@@ -25,7 +26,7 @@ import { QueryModule } from './query/query.module';
         username: config.get<string>('DB_USER', 'postgres'),
         password: config.get<string>('DB_PASSWORD', 'postgres'),
         database: config.get<string>('DB_NAME', 'ai_knowledge'),
-        entities: [DocumentEntity, DocumentChunkEntity],
+        entities: [DocumentEntity, DocumentChunkEntity, LlmGatewayLogEntity],
         // Schema is created by db/init.sql (pgvector needs the vector type).
         synchronize: false,
         // Managed Postgres (Neon/Supabase/Render) requires SSL. Set DB_SSL=true.

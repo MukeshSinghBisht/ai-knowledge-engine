@@ -32,3 +32,44 @@ CREATE INDEX IF NOT EXISTS idx_document_chunks_embedding
 
 CREATE INDEX IF NOT EXISTS idx_document_chunks_document_id
   ON document_chunks (document_id);
+
+-- AI Gateway 4.1: per-call cost / latency telemetry (same DB as RAG).
+DO $$ BEGIN
+  CREATE TYPE llm_gateway_operation AS ENUM (
+    'generate',
+    'tools',
+    'embed'
+  );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE llm_retrieval_mode AS ENUM (
+    'simple',
+    'thorough'
+  );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+CREATE TABLE IF NOT EXISTS llm_gateway_logs (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  request_id      text NOT NULL,
+  operation       llm_gateway_operation NOT NULL,
+  provider        text NOT NULL,
+  model           text NOT NULL,
+  retrieval_mode  llm_retrieval_mode,
+  top_k           int,
+  input_tokens    int NOT NULL DEFAULT 0,
+  output_tokens   int NOT NULL DEFAULT 0,
+  cost_usd        numeric(14, 8) NOT NULL DEFAULT 0,
+  latency_ms      int NOT NULL,
+  created_at      timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_llm_gateway_logs_request_id
+  ON llm_gateway_logs (request_id);
+
+CREATE INDEX IF NOT EXISTS idx_llm_gateway_logs_created_at
+  ON llm_gateway_logs (created_at);

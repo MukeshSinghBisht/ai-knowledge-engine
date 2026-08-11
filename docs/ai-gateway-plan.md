@@ -22,15 +22,20 @@ Controller → Query/Chat service → AI Gateway → provider (Ollama | Gemini |
 
 ---
 
-## Gateway Phase 1 — Cost & latency telemetry
+## Gateway Phase 1 — Cost & latency telemetry ✅
 
-- Wrap existing LLM provider calls in a **single gateway function** (no direct provider
-  calls from chat/query/embed).
-- Per-provider cost table: OpenAI + Gemini input/output token pricing; **Ollama = $0**,
-  track **compute time** instead.
-- Log every call: provider, input tokens, output tokens, calculated cost, latency, timestamp.
-- Store in **`llm_gateway_logs`** (same Postgres as RAG).
-- Add **`requestId`** on each log row to trace back to the original user query.
+- Wrap existing LLM provider calls in `LlmService` (generate / tools / embed).
+  `/chat` and `/chat/structured` both log as `generate`.
+- Per-provider **cost rates** from `.env` (not a DB table) — same pattern for all three:
+  `OLLAMA_INPUT_USD_PER_1M` / `OLLAMA_OUTPUT_USD_PER_1M`,
+  `OPENAI_INPUT_USD_PER_1M` / `OPENAI_OUTPUT_USD_PER_1M`,
+  `GEMINI_INPUT_USD_PER_1M` / `GEMINI_OUTPUT_USD_PER_1M`
+  with defaults in `DEFAULT_COST_RATES` (`src/gateway/llm-cost.ts`).
+  Ollama rates are demo assumptions (local is free in reality).
+- Log every call to **`llm_gateway_logs`**: provider, tokens, `cost_usd`, `latency_ms`,
+  `retrieval_mode` / `top_k` (when from `/query`), timestamp, `request_id`.
+- `/chat` and `/query` responses include `requestId`, `costUsd`, `latencyMs` (API JSON; same values as the log row).
+- One `/query` uses the **same `requestId`** for retrieve (embed) + generate (chat).
 
 **Done when:** `/chat` and `/query` go through the gateway; you can query logs and explain
 cost vs latency for one request.

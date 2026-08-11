@@ -5,7 +5,8 @@ NestJS API with switchable **Ollama**, **Google Gemini**, or **OpenAI** provider
 - **Phase 1:** chat, structured output, tool/function calling
 - **Phase 2 (Week 3):** pgvector semantic search — store documents (chunk + embed) and search by meaning
 - **Phase 3:** RAG `/query` (retrieve + answer grounded in sources) and file upload (`.txt`/`.pdf`) with duplicate detection
-- **Next — Phase 4: AI Gateway** — cost & latency telemetry, automatic provider fallback, per-user rate limits, cost summary API
+- **Phase 4.1 (AI Gateway telemetry):** every LLM call is logged with tokens, estimated cost, latency, and `requestId`
+- **Next:** fallback → Redis rate limit → cost summary API
 
 After that: async ingestion (BullMQ), SSE streaming, JWT multi-tenant auth.
 
@@ -130,7 +131,10 @@ curl -X POST http://localhost:3000/chat \
     "promptTokens": 25,
     "completionTokens": 40,
     "totalTokens": 65
-  }
+  },
+  "requestId": "3f1c0a8e-2b7d-4c11-9a55-8d2e1f0b7c44",
+  "costUsd": 0.0000037,
+  "latencyMs": 842
 }
 ```
 
@@ -162,7 +166,10 @@ curl -X POST http://localhost:3000/chat/structured \
     "promptTokens": 120,
     "completionTokens": 80,
     "totalTokens": 200
-  }
+  },
+  "requestId": "3f1c0a8e-2b7d-4c11-9a55-8d2e1f0b7c44",
+  "costUsd": 0.0000088,
+  "latencyMs": 1200
 }
 ```
 
@@ -241,11 +248,16 @@ curl -X POST http://localhost:3000/query \
   ],
   "model": "llama3.2",
   "provider": "ollama",
-  "usage": { "promptTokens": 485, "completionTokens": 29, "totalTokens": 514 }
+  "usage": { "promptTokens": 485, "completionTokens": 29, "totalTokens": 514 },
+  "requestId": "3f1c0a8e-2b7d-4c11-9a55-8d2e1f0b7c44",
+  "costUsd": 0.00001202,
+  "latencyMs": 842
 }
 ```
 
 If nothing relevant is stored, it replies `"I don't know based on the available documents."` instead of guessing.
+
+`requestId` matches rows in `llm_gateway_logs` (embed + generate for one `/query` share the same id). All providers use `.env` token rates (`*_USD_PER_1M`); Ollama values are demo assumptions (local is free in reality).
 
 ## Project structure
 
@@ -256,10 +268,9 @@ src/
   query/      POST /query (RAG: retrieve + generate)
   health/     GET /health
   llm/        Ollama + Gemini + OpenAI providers, tools/, embeddings
-  gateway/    (planned) single entry for LLM calls — cost, fallback, rate limits
+  gateway/    cost table + llm_gateway_logs (4.1 telemetry)
 db/
-  init.sql    pgvector extension + schema + HNSW index
-              (planned) llm_gateway_logs
+  init.sql    pgvector + llm_gateway_logs
 demo/
   README.md               step-by-step demo runbook
   demo.gif                inline README preview (~2.7 MB)
@@ -283,7 +294,7 @@ All LLM calls go through one gateway instead of hitting providers directly.
 
 | Slice | What it adds |
 |-------|----------------|
-| **4.1 Telemetry** | Cost table (OpenAI/Gemini; Ollama = $0 + compute time), log tokens/cost/latency/`requestId` in `llm_gateway_logs` |
+| **4.1 Telemetry** | **Done.** Config cost table, `llm_gateway_logs`, `requestId` + cost + latency on `/chat` and `/query` |
 | **4.2 Fallback** | Ordered retry (e.g. OpenAI → Gemini → Ollama), timeout, max attempts, log primary vs fallback |
 | **4.3 Rate limit** | Redis counter per user/API key; **429** when over X req/min |
 | **4.4 Summary API** | `GET /gateway/summary` — cost today, by provider, avg latency (JSON only) |

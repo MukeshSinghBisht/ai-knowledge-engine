@@ -31,6 +31,26 @@ export interface ToolChatResult {
   usage: TokenUsage;
 }
 
+export interface GatewayMeta {
+  requestId: string;
+  costUsd: number;
+  latencyMs: number;
+}
+
+export type GatewayChatResult = ChatResult & GatewayMeta;
+export type GatewayStructuredChatResult = StructuredChatResult & GatewayMeta;
+export type GatewayToolChatResult = ToolChatResult & GatewayMeta;
+
+import type { RetrievalMode } from '../gateway/retrieval-mode';
+
+export type LlmCallOptions = {
+  requestId?: string;
+  /** RAG depth label from the UI (omit for non-query calls). */
+  retrievalMode?: RetrievalMode;
+  /** Chunks retrieved for this query (logged on embed + generate). */
+  topK?: number;
+};
+
 export type LlmProviderName = 'ollama' | 'gemini' | 'openai';
 
 export interface LlmProvider {

@@ -23,7 +23,7 @@ async function bootstrap() {
   const swaggerConfig = new DocumentBuilder()
     .setTitle('AI Knowledge Engine')
     .setDescription(
-      'Phase 1 chat API. Providers: Ollama (default) | Gemini | OpenAI. Set LLM_PROVIDER in .env.',
+      'RAG API with AI Gateway telemetry. Providers: Ollama (default) | Gemini | OpenAI. Set LLM_PROVIDER in .env.',
     )
     .setVersion('0.1.0')
     .addTag('health', 'Service health')

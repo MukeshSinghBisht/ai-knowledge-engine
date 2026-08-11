@@ -1,6 +1,8 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { randomUUID } from 'node:crypto';
 import { DataSource, QueryFailedError, Repository } from 'typeorm';
+import { RetrievalMode } from '../gateway/retrieval-mode';
 import { LlmService } from '../llm/llm.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import {
@@ -94,8 +96,11 @@ export class DocumentsService {
 
     // Embed everything FIRST, before any DB write. If the embedding provider
     // fails, nothing is persisted — no orphan document row is left behind.
+    const ingestRequestId = randomUUID();
     const embeddings = await Promise.all(
-      chunks.map((chunk) => this.llmService.embed(chunk)),
+      chunks.map((chunk) =>
+        this.llmService.embed(chunk, { requestId: ingestRequestId }),
+      ),
     );
 
     // Persist the document and all its chunks atomically.
@@ -166,9 +171,20 @@ export class DocumentsService {
     };
   }
 
-  async search(dto: SearchDto): Promise<SearchResponseDto> {
+  async search(
+    dto: SearchDto,
+    options?: {
+      requestId?: string;
+      retrievalMode?: RetrievalMode;
+      topK?: number;
+    },
+  ): Promise<SearchResponseDto> {
     const topK = dto.topK ?? 5;
-    const embedding = await this.llmService.embed(dto.query);
+    const embedding = await this.llmService.embed(dto.query, {
+      requestId: options?.requestId,
+      retrievalMode: options?.retrievalMode,
+      topK: options?.topK ?? topK,
+    });
     const queryVector = toVectorLiteral(embedding);
 
     const rows = await this.dataSource.query<SearchRow[]>(

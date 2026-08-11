@@ -68,6 +68,9 @@ export class ChatService {
           model: result.model,
           provider: result.provider,
           usage: result.usage,
+          requestId: result.requestId,
+          costUsd: result.costUsd,
+          latencyMs: result.latencyMs,
         };
       } catch (error) {
         if (

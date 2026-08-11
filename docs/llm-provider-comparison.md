@@ -10,7 +10,7 @@ Which API to use for this project and the **12-week AI backend roadmap**.
 
 | Option | Cost | Chat | Embeddings (RAG) | API key | Best for |
 |--------|------|------|------------------|---------|----------|
-| **Ollama (local)** | **$0 forever** | ✅ | ✅ (`nomic-embed-text`) | No | **Best overall for learning** |
+| **Ollama (local)** | **$0 real bill** (gateway uses demo `*_USD_PER_1M`) | ✅ | ✅ (`nomic-embed-text`) | No | **Best overall for learning** |
 | **Google Gemini** | Free tier | ✅ | ✅ | Yes (free) | Free cloud, no GPU needed |
 | **Groq** | Free tier | ✅ fast | ❌ | Yes (free) | Week 1 chat only |
 | **GitHub Models** | Free | ✅ | ❌ | GitHub token | Quick chat experiments |
@@ -49,8 +49,18 @@ OPENAI_CHAT_MODEL=gpt-4o-mini
 
 ## Next: AI Gateway
 
-Providers stay the same. The next phase wraps them in one gateway: cost table
-(OpenAI/Gemini; Ollama = $0), fallback order, rate limits, `llm_gateway_logs`.
+Providers stay the same. The gateway wraps them with one cost table
+(`OLLAMA_*` / `OPENAI_*` / `GEMINI_*_USD_PER_1M` — Ollama rates are demo assumptions;
+local is free in reality), fallback order, rate limits, `llm_gateway_logs`.
+
+```env
+OLLAMA_INPUT_USD_PER_1M=0.02
+OLLAMA_OUTPUT_USD_PER_1M=0.08
+OPENAI_INPUT_USD_PER_1M=0.15
+OPENAI_OUTPUT_USD_PER_1M=0.60
+GEMINI_INPUT_USD_PER_1M=0.075
+GEMINI_OUTPUT_USD_PER_1M=0.30
+```
 
 See [ai-gateway-plan.md](./ai-gateway-plan.md).
 

@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  IsEnum,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -9,6 +10,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { RetrievalMode } from '../../gateway/retrieval-mode';
 
 export class QueryDto {
   @ApiProperty({
@@ -22,8 +24,19 @@ export class QueryDto {
   query: string;
 
   @ApiPropertyOptional({
+    enum: RetrievalMode,
+    example: RetrievalMode.Simple,
+    description:
+      'Research depth. simple = 2 chunks (cheaper); thorough = 12 chunks (more context).',
+  })
+  @IsOptional()
+  @IsEnum(RetrievalMode)
+  mode?: RetrievalMode;
+
+  @ApiPropertyOptional({
     example: 4,
-    description: 'Number of chunks to retrieve as context (default 4)',
+    description:
+      'Number of chunks to retrieve (default: 4, or 2/12 when mode is simple/thorough)',
     minimum: 1,
     maximum: 20,
   })
