@@ -4,6 +4,8 @@
 **UI:** http://localhost:3000 (or http://localhost:3001 if 3000 is busy)  
 **Goal:** show RAG grounding **and** gateway telemetry (cost, latency, retrieval depth).
 
+**Recorded demo:** [AIKE-GATE-TELEMETRY-DEMO2.mp4](./AIKE-GATE-TELEMETRY-DEMO2.mp4)
+
 ---
 
 ## 0. Setup (before the call)

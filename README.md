@@ -19,7 +19,9 @@ See [docs/BRD.md](./docs/BRD.md) for requirements and [docs/ai-gateway-plan.md](
 
 ![AI Knowledge Engine demo](./demo/demo.gif)
 
-**[Full quality (MP4)](./demo/aiknowledgeenginedemo1.mp4)** · **[Captions (SRT)](./demo/aiknowledgeenginedemo1.srt)**
+**RAG walkthrough:** [Full quality (MP4)](./demo/aiknowledgeenginedemo1.mp4) · [Captions (SRT)](./demo/aiknowledgeenginedemo1.srt)
+
+**AI Gateway telemetry (Simple vs Thorough):** [AIKE-GATE-TELEMETRY-DEMO2.mp4](./demo/AIKE-GATE-TELEMETRY-DEMO2.mp4) · script: [demo/GATEWAY-COST-DEMO.md](./demo/GATEWAY-COST-DEMO.md)
 
 Open the built-in chat UI at **http://localhost:3000/** (upload a PDF/TXT, ask a question, see answer + sources).
 
@@ -273,9 +275,11 @@ db/
   init.sql    pgvector + llm_gateway_logs
 demo/
   README.md               step-by-step demo runbook
+  GATEWAY-COST-DEMO.md    Simple vs Thorough + gateway cost talk track
   demo.gif                inline README preview (~2.7 MB)
-  aiknowledgeenginedemo1.mp4   full-quality walkthrough
-  aiknowledgeenginedemo1.srt   captions for the demo video
+  aiknowledgeenginedemo1.mp4   RAG walkthrough
+  aiknowledgeenginedemo1.srt   captions for the RAG demo
+  AIKE-GATE-TELEMETRY-DEMO2.mp4   gateway cost / Simple vs Thorough demo
   ai-knowledge-engine-handbook.pdf   sample doc ("ask the AI about itself")
   generate-handbook.js    regenerates the PDF
 docker-compose.yml   Postgres 16 + pgvector
@@ -300,7 +304,8 @@ All LLM calls go through one gateway instead of hitting providers directly.
 | **4.4 Summary API** | `GET /gateway/summary` — cost today, by provider, avg latency (JSON only) |
 | **4.5 Positioning** | README + short demo + resume line: *AI Gateway / LLM cost & telemetry management* |
 
-**4.1 alone is demoable.** Full plan: [docs/ai-gateway-plan.md](./docs/ai-gateway-plan.md).
+**4.1 alone is demoable.** Full plan: [docs/ai-gateway-plan.md](./docs/ai-gateway-plan.md).  
+Recorded gateway demo: [AIKE-GATE-TELEMETRY-DEMO2.mp4](./demo/AIKE-GATE-TELEMETRY-DEMO2.mp4) · [GATEWAY-COST-DEMO.md](./demo/GATEWAY-COST-DEMO.md).
 
 ## Live walkthrough
 
@@ -310,6 +315,9 @@ question it has no data for, then upload another document and watch it answer in
 Use `DELETE /documents` to reset between runs. Preview: [demo.gif](./demo/demo.gif) ·
 full quality: [aiknowledgeenginedemo1.mp4](./demo/aiknowledgeenginedemo1.mp4)
 ([captions](./demo/aiknowledgeenginedemo1.srt)).
+
+Gateway / cost slice: [AIKE-GATE-TELEMETRY-DEMO2.mp4](./demo/AIKE-GATE-TELEMETRY-DEMO2.mp4)
+([script](./demo/GATEWAY-COST-DEMO.md)).
 
 ## Related
 

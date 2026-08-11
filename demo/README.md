@@ -7,7 +7,9 @@ an expert on any document you give it — no code change.
 
 **Gateway / cost demo (Simple vs Thorough):** see [GATEWAY-COST-DEMO.md](./GATEWAY-COST-DEMO.md).
 
-## Recorded demo
+**[Recorded gateway demo (MP4)](./AIKE-GATE-TELEMETRY-DEMO2.mp4)**
+
+## Recorded demo (RAG)
 
 ![AI Knowledge Engine demo](./demo.gif)
 
@@ -192,7 +194,9 @@ Recruiters skim — a 60–90 second clip beats a wall of text. Keep it short an
 Already linked from this file and the root README:
 
 - GIF (inline preview): [`demo.gif`](./demo.gif)
-- Video: [`aiknowledgeenginedemo1.mp4`](./aiknowledgeenginedemo1.mp4)
-- Captions: [`aiknowledgeenginedemo1.srt`](./aiknowledgeenginedemo1.srt)
+- RAG video: [`aiknowledgeenginedemo1.mp4`](./aiknowledgeenginedemo1.mp4)
+- RAG captions: [`aiknowledgeenginedemo1.srt`](./aiknowledgeenginedemo1.srt)
+- Gateway telemetry video: [`AIKE-GATE-TELEMETRY-DEMO2.mp4`](./AIKE-GATE-TELEMETRY-DEMO2.mp4)
+- Gateway talk track: [`GATEWAY-COST-DEMO.md`](./GATEWAY-COST-DEMO.md)
 
 To replace later: overwrite those files and re-run the MP4→GIF conversion if needed.

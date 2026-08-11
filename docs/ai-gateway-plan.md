@@ -7,6 +7,8 @@ Interview / resume language to match job postings:
 
 > AI Gateway / LLM cost & telemetry management
 
+**Recorded demo:** [AIKE-GATE-TELEMETRY-DEMO2.mp4](../demo/AIKE-GATE-TELEMETRY-DEMO2.mp4) · talk track: [GATEWAY-COST-DEMO.md](../demo/GATEWAY-COST-DEMO.md)
+
 ---
 
 ## Why this next
