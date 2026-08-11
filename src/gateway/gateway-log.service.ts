@@ -178,6 +178,14 @@ export class GatewayLogService implements OnModuleInit {
     void this.persist(entry);
   }
 
+  async listRecent(limit = 20): Promise<LlmGatewayLogEntity[]> {
+    const take = Math.min(Math.max(limit, 1), 100);
+    return this.logRepository.find({
+      order: { createdAt: 'DESC' },
+      take,
+    });
+  }
+
   private async persist(entry: GatewayLogInput): Promise<void> {
     try {
       await this.logRepository.save(

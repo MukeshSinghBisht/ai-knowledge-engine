@@ -337,6 +337,51 @@
           max-width: 95%;
         }
       }
+
+      .logs-panel {
+        display: none;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 12px;
+        box-shadow: var(--shadow);
+        max-height: 240px;
+        overflow: auto;
+      }
+
+      .logs-panel.open {
+        display: block;
+      }
+
+      .logs-panel .logs-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+
+      .logs-panel table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.75rem;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+
+      .logs-panel th,
+      .logs-panel td {
+        text-align: left;
+        padding: 6px 8px;
+        border-bottom: 1px solid var(--border);
+        white-space: nowrap;
+      }
+
+      .logs-panel th {
+        color: var(--muted);
+        font-weight: 600;
+      }
     </style>
   </head>
   <body>
@@ -353,6 +398,9 @@
             Upload file
             <input id="file" type="file" accept=".pdf,.txt,text/plain,application/pdf" />
           </label>
+          <button id="logsBtn" type="button" title="Show recent AI Gateway logs">
+            Gateway logs
+          </button>
           <button id="wipe" class="danger" type="button" title="Delete all documents">
             Wipe data
           </button>
@@ -361,10 +409,18 @@
 
       <div id="status" class="status">Ready. Upload a document to begin.</div>
 
+      <section id="logsPanel" class="logs-panel" aria-live="polite">
+        <div class="logs-head">
+          <span>Recent <code>llm_gateway_logs</code></span>
+          <button id="refreshLogs" type="button">Refresh</button>
+        </div>
+        <div id="logsBody">No logs loaded yet.</div>
+      </section>
+
       <main id="chat" class="chat">
         <div class="empty" id="empty">
           Tip: upload <code>demo/ai-knowledge-engine-handbook.pdf</code>, ask
-          “What embedding model does this project use?”, then compare
+          exactly “what is the embedding model used in this project?”, then compare
           <strong>Simple</strong> vs <strong>Thorough</strong> cost under the answer.
         </div>
       </main>
@@ -402,6 +458,10 @@
       const statusEl = document.getElementById('status');
       const fileInput = document.getElementById('file');
       const wipeBtn = document.getElementById('wipe');
+      const logsBtn = document.getElementById('logsBtn');
+      const refreshLogsBtn = document.getElementById('refreshLogs');
+      const logsPanel = document.getElementById('logsPanel');
+      const logsBody = document.getElementById('logsBody');
       const form = document.getElementById('composer');
       const questionInput = document.getElementById('question');
       const askBtn = document.getElementById('ask');
@@ -489,8 +549,94 @@
         askBtn.disabled = busy;
         fileInput.disabled = busy;
         wipeBtn.disabled = busy;
+        logsBtn.disabled = busy;
+        refreshLogsBtn.disabled = busy;
         questionInput.disabled = busy;
       }
+
+      function formatCost(value) {
+        const n = Number(value);
+        return Number.isFinite(n) ? '$' + n.toFixed(6) : '-';
+      }
+
+      function shortId(id) {
+        if (!id) return '-';
+        return String(id).slice(0, 8);
+      }
+
+      async function loadGatewayLogs() {
+        logsBody.textContent = 'Loading…';
+        try {
+          const res = await fetch('/gateway/logs?limit=20');
+          const rows = await res.json();
+          if (!res.ok) {
+            throw new Error(rows.message || 'Failed to load logs');
+          }
+          if (!Array.isArray(rows) || rows.length === 0) {
+            logsBody.textContent = 'No gateway log rows yet. Ask a question first.';
+            return;
+          }
+
+          const head =
+            '<table><thead><tr>' +
+            '<th>when</th><th>op</th><th>mode</th><th>topK</th>' +
+            '<th>cost</th><th>ms</th><th>tokens</th><th>request</th>' +
+            '</tr></thead><tbody>';
+
+          const body = rows
+            .map((row) => {
+              const when = row.createdAt
+                ? new Date(row.createdAt).toLocaleTimeString()
+                : '-';
+              const tokens =
+                (row.inputTokens || 0) + '/' + (row.outputTokens || 0);
+              return (
+                '<tr>' +
+                '<td>' +
+                escapeHtml(when) +
+                '</td>' +
+                '<td>' +
+                escapeHtml(row.operation || '-') +
+                '</td>' +
+                '<td>' +
+                escapeHtml(row.retrievalMode || '-') +
+                '</td>' +
+                '<td>' +
+                escapeHtml(row.topK == null ? '-' : String(row.topK)) +
+                '</td>' +
+                '<td>' +
+                escapeHtml(formatCost(row.costUsd)) +
+                '</td>' +
+                '<td>' +
+                escapeHtml(String(row.latencyMs ?? '-')) +
+                '</td>' +
+                '<td>' +
+                escapeHtml(tokens) +
+                '</td>' +
+                '<td title="' +
+                escapeHtml(row.requestId || '') +
+                '">' +
+                escapeHtml(shortId(row.requestId)) +
+                '</td>' +
+                '</tr>'
+              );
+            })
+            .join('');
+
+          logsBody.innerHTML = head + body + '</tbody></table>';
+        } catch (err) {
+          logsBody.textContent = 'Error: ' + err.message;
+        }
+      }
+
+      logsBtn.addEventListener('click', async () => {
+        const opening = !logsPanel.classList.contains('open');
+        logsPanel.classList.toggle('open', opening);
+        logsBtn.textContent = opening ? 'Hide logs' : 'Gateway logs';
+        if (opening) await loadGatewayLogs();
+      });
+
+      refreshLogsBtn.addEventListener('click', () => loadGatewayLogs());
 
       fileInput.addEventListener('change', async () => {
         const file = fileInput.files && fileInput.files[0];

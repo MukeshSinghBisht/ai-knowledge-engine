@@ -43,27 +43,32 @@ Say out loud if you do this: *“These are demo assumptions so cost is readable;
 ## 2. Grounded fact (Simple) (~1 min)
 
 **Mode:** Simple  
-**Ask:** `What embedding model does this project use and how many dimensions?`
+**Ask exactly (wording matters):**  
+`what is the embedding model used in this project?`
+
+Do **not** add “and how many dimensions?” — that phrasing can rank the right chunk into top-2 and Simple may succeed.
 
 **What to point at under the answer:**
-- Sources (expand one)
+- Sources (expand Source 1 / 2 — usually providers / data-model, **not** `nomic-embed-text`)
 - Meta: `Simple · topK 2 · … · $… · requestId`
 
-**Say:** *“Simple only pulls the top 2 chunks — cheaper, but it can miss the answer if the fact isn’t in those hits.”*
+**Expect (usually):** *I don't know based on the available documents.*  
+**Say:** *“Simple only pulls the top 2 chunks — cheaper, but the fact we need ranked lower, so the model correctly refuses.”*
 
-> If Simple says “I don’t know”, that’s a **feature for the next beat** — don’t panic. Open Source 1/2 and show they don’t name `nomic-embed-text`.
+> If Simple unexpectedly answers, open the sources anyway and still go to Thorough to show **more sources + higher `$`**. Cost contrast still works.
 
 ---
 
 ## 3. Same question, Thorough (~1–2 min) — cost contrast
 
 **Mode:** Thorough  
-**Ask the same question again.**
+**Ask the same exact question again:**  
+`what is the embedding model used in this project?`
 
 **Expect:** correct answer (`nomic-embed-text`, 768 dims), more sources, **higher `$` cost**.
 
 **Say:**  
-*“Thorough uses 12 chunks. More context → more prompt tokens → higher estimated cost. Same question, different spend — that’s a real product knob (quick FAQ vs deep research).”*
+*“Thorough uses 12 chunks, so the nomic-embed-text passage is included. More context → more tokens → higher estimated cost. Same question, different spend.”*
 
 Compare the two `$` values on screen.
 
@@ -81,24 +86,18 @@ Compare the two `$` values on screen.
 
 ---
 
-## 5. Gateway logs (optional, ~1 min)
+## 5. Gateway logs in the UI (~1 min)
 
-If you have a DB client / `psql`:
+Click **Gateway logs** (toolbar). Hit **Refresh** after your Simple/Thorough asks.
 
-```sql
-SELECT request_id, operation, retrieval_mode, top_k, cost_usd, latency_ms
-FROM llm_gateway_logs
-ORDER BY created_at DESC
-LIMIT 12;
-```
-
-**Point out:**
-- One UI ask → rows for `embed` + `generate` sharing the same `request_id`
-- `retrieval_mode` = `simple` / `thorough`
-- `top_k` = 2 / 12
-- `cost_usd` / `latency_ms` match what the UI showed
+**Point out in the table:**
+- One UI ask → `embed` + `generate` rows (same `request` id prefix)
+- `mode` = `simple` / `thorough`, `topK` = 2 / 12
+- `cost` / `ms` match the answer meta line
 
 **Say:** *“This is the AI Gateway layer — every LLM call is metered for cost and latency, not just answered.”*
+
+(Optional SQL still works via `docker exec aike-postgres psql …` if you want.)
 
 ---
 
@@ -112,9 +111,9 @@ LIMIT 12;
 
 | Beat | Mode | Question | Prove |
 |------|------|----------|--------|
-| 1 | Simple | Embedding model + dimensions? | Cheap path; may miss |
-| 2 | Thorough | Same question | Correct + higher cost |
+| 1 | Simple | `what is the embedding model used in this project?` | Miss / refuse (top-2 miss the fact) |
+| 2 | Thorough | Same exact question | Correct + higher cost |
 | 3 | Any | Who painted the Mona Lisa? | Grounding / refuse |
-| 4 | — | SQL on `llm_gateway_logs` | Telemetry + mode in DB |
+| 4 | — | **Gateway logs** button | Telemetry + mode in UI |
 
 **File to upload:** `demo/ai-knowledge-engine-handbook.pdf`

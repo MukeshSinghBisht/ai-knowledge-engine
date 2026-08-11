@@ -10,6 +10,7 @@ import { DocumentsModule } from './documents/documents.module';
 import { DocumentChunkEntity } from './documents/entities/document-chunk.entity';
 import { DocumentEntity } from './documents/entities/document.entity';
 import { LlmGatewayLogEntity } from './gateway/entities/llm-gateway-log.entity';
+import { GatewayModule } from './gateway/gateway.module';
 import { HealthModule } from './health/health.module';
 import { LlmModule } from './llm/llm.module';
 import { QueryModule } from './query/query.module';
@@ -49,6 +50,7 @@ import { QueryModule } from './query/query.module';
         ],
       }),
     }),
+    GatewayModule,
     LlmModule,
     HealthModule,
     ChatModule,

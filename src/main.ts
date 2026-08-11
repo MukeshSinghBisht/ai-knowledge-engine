@@ -30,6 +30,7 @@ async function bootstrap() {
     .addTag('chat', 'LLM chat completions (Gemini or OpenAI)')
     .addTag('documents', 'Document ingestion + semantic search (pgvector)')
     .addTag('query', 'RAG: ask questions answered from stored documents')
+    .addTag('gateway', 'AI Gateway telemetry (cost / latency logs)')
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);
