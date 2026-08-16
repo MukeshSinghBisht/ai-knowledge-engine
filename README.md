@@ -253,13 +253,16 @@ curl -X POST http://localhost:3000/query \
   "usage": { "promptTokens": 485, "completionTokens": 29, "totalTokens": 514 },
   "requestId": "3f1c0a8e-2b7d-4c11-9a55-8d2e1f0b7c44",
   "costUsd": 0.00001202,
-  "latencyMs": 842
+  "latencyMs": 842,
+  "attempts": [
+    { "attempt": 1, "provider": "ollama", "outcome": "success", "latencyMs": 842 }
+  ]
 }
 ```
 
 If nothing relevant is stored, it replies `"I don't know based on the available documents."` instead of guessing.
 
-`requestId` matches rows in `llm_gateway_logs` (embed + generate for one `/query` share the same id). All providers use `.env` token rates (`*_USD_PER_1M`); Ollama values are demo assumptions (local is free in reality).
+`requestId` matches rows in `llm_gateway_logs` (embed + generate for one `/query` share the same id). Generate calls may retry providers per `LLM_FALLBACK_ORDER` / `LLM_TIMEOUT_MS`; `attempts[]` lists each try (UI: collapsed **Provider attempts**). Embeddings use `LLM_EMBEDDING_PROVIDER` (defaults to `LLM_PROVIDER`) and do not cross-provider fall back. All providers use `.env` token rates (`*_USD_PER_1M`); Ollama values are demo assumptions (local is free in reality).
 
 ## Project structure
 
@@ -270,7 +273,7 @@ src/
   query/      POST /query (RAG: retrieve + generate)
   health/     GET /health
   llm/        Ollama + Gemini + OpenAI providers, tools/, embeddings
-  gateway/    cost table + llm_gateway_logs (4.1 telemetry)
+  gateway/    cost table + fallback order + llm_gateway_logs (4.1–4.2)
 db/
   init.sql    pgvector + llm_gateway_logs
 demo/
@@ -299,7 +302,7 @@ All LLM calls go through one gateway instead of hitting providers directly.
 | Slice | What it adds |
 |-------|----------------|
 | **4.1 Telemetry** | **Done.** Config cost table, `llm_gateway_logs`, `requestId` + cost + latency on `/chat` and `/query` |
-| **4.2 Fallback** | Ordered retry (e.g. OpenAI → Gemini → Ollama), timeout, max attempts, log primary vs fallback |
+| **4.2 Fallback** | **Done.** Ordered retry + timeout (`LLM_FALLBACK_ORDER` / `LLM_TIMEOUT_MS`), `attempts[]` on responses, UI panel |
 | **4.3 Rate limit** | Redis counter per user/API key; **429** when over X req/min |
 | **4.4 Summary API** | `GET /gateway/summary` — cost today, by provider, avg latency (JSON only) |
 | **4.5 Positioning** | README + short demo + resume line: *AI Gateway / LLM cost & telemetry management* |

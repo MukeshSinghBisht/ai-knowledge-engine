@@ -71,6 +71,7 @@ export class ChatService {
           requestId: result.requestId,
           costUsd: result.costUsd,
           latencyMs: result.latencyMs,
+          attempts: result.attempts,
         };
       } catch (error) {
         if (

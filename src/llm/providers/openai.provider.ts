@@ -89,7 +89,7 @@ export class OpenAiProvider implements LlmProvider {
 
   async embed(): Promise<number[]> {
     throw new ServiceUnavailableException(
-      'Embeddings are not implemented for the OpenAI provider yet. Set LLM_PROVIDER=ollama (nomic-embed-text, 768 dims).',
+      'Embeddings are not implemented for the OpenAI provider yet. Set LLM_EMBEDDING_PROVIDER=ollama (nomic-embed-text, 768 dims).',
     );
   }
 

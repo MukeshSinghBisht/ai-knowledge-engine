@@ -44,16 +44,21 @@ cost vs latency for one request.
 
 ---
 
-## Gateway Phase 2 — Automatic fallback
+## Gateway Phase 2 — Automatic fallback ✅
 
-- Fallback order (config): e.g. **OpenAI → Gemini → Ollama**.
-- Primary call in try/catch with a **timeout** (e.g. 10s).
-- On timeout/error, retry the next provider.
-- Log which attempt succeeded (**primary vs fallback**) and why the previous failed.
-- **Max-retry limit** so it does not loop if all providers fail.
+- Fallback order (config): `LLM_FALLBACK_ORDER` (e.g. **ollama,gemini,openai**).
+  Primary is always `LLM_PROVIDER`, then unique names from the list.
+- Each generate attempt uses a **timeout** (`LLM_TIMEOUT_MS`, default 10s).
+- On timeout/error, retry the next provider (capped by `LLM_MAX_ATTEMPTS`).
+- Log each attempt: `attempt`, `outcome` (`success` \| `timeout` \| `error`), `failure_reason`.
+- API responses include `attempts[]` (UI shows a collapsed “Provider attempts” panel).
+- **Embeddings** use `LLM_EMBEDDING_PROVIDER` (defaults to `LLM_PROVIDER`) and
+  **do not fall back** across providers (vector dims must match ingest).
+  Demo tip: `LLM_PROVIDER=openai` + empty key + `LLM_EMBEDDING_PROVIDER=ollama`
+  exercises generate fallback while RAG still embeds locally.
 
-**Done when:** you can kill/timeout the primary provider and still get an answer + a log
-that shows fallback.
+**Done when:** you can kill/timeout the primary provider and still get an answer + logs
+that show fallback; all failures → 503.
 
 ---
 

@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { TokenUsageDto } from './chat-response.dto';
+import { ProviderAttemptDto, TokenUsageDto } from './chat-response.dto';
 
 export class ToolChatResponseDto {
   @ApiProperty({ example: 'Today is July 19, 2026.' })
@@ -32,4 +32,7 @@ export class ToolChatResponseDto {
 
   @ApiProperty({ example: 650 })
   latencyMs: number;
+
+  @ApiProperty({ type: [ProviderAttemptDto] })
+  attempts: ProviderAttemptDto[];
 }

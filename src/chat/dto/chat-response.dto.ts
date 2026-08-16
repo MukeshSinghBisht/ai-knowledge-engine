@@ -11,6 +11,29 @@ export class TokenUsageDto {
   totalTokens: number;
 }
 
+export class ProviderAttemptDto {
+  @ApiProperty({ example: 1 })
+  attempt: number;
+
+  @ApiProperty({ example: 'openai', enum: ['ollama', 'gemini', 'openai'] })
+  provider: string;
+
+  @ApiProperty({
+    example: 'timeout',
+    enum: ['success', 'timeout', 'error'],
+  })
+  outcome: 'success' | 'timeout' | 'error';
+
+  @ApiProperty({ example: 10012 })
+  latencyMs: number;
+
+  @ApiProperty({
+    example: 'Timed out after 10000ms',
+    required: false,
+  })
+  failureReason?: string;
+}
+
 export class ChatResponseDto {
   @ApiProperty({
     example:
@@ -41,7 +64,13 @@ export class ChatResponseDto {
 
   @ApiProperty({
     example: 842,
-    description: 'LLM call wall-clock time in milliseconds',
+    description: 'Successful provider attempt wall-clock time in milliseconds',
   })
   latencyMs: number;
+
+  @ApiProperty({
+    type: [ProviderAttemptDto],
+    description: 'Gateway provider attempts (primary + any fallbacks)',
+  })
+  attempts: ProviderAttemptDto[];
 }

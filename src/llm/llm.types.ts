@@ -1,3 +1,7 @@
+import type { RetrievalMode } from '../gateway/retrieval-mode';
+
+export type LlmProviderName = 'ollama' | 'gemini' | 'openai';
+
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -31,17 +35,26 @@ export interface ToolChatResult {
   usage: TokenUsage;
 }
 
+export type ProviderAttemptOutcome = 'success' | 'timeout' | 'error';
+
+export interface ProviderAttempt {
+  attempt: number;
+  provider: LlmProviderName;
+  outcome: ProviderAttemptOutcome;
+  latencyMs: number;
+  failureReason?: string;
+}
+
 export interface GatewayMeta {
   requestId: string;
   costUsd: number;
   latencyMs: number;
+  attempts: ProviderAttempt[];
 }
 
 export type GatewayChatResult = ChatResult & GatewayMeta;
 export type GatewayStructuredChatResult = StructuredChatResult & GatewayMeta;
 export type GatewayToolChatResult = ToolChatResult & GatewayMeta;
-
-import type { RetrievalMode } from '../gateway/retrieval-mode';
 
 export type LlmCallOptions = {
   requestId?: string;
@@ -50,8 +63,6 @@ export type LlmCallOptions = {
   /** Chunks retrieved for this query (logged on embed + generate). */
   topK?: number;
 };
-
-export type LlmProviderName = 'ollama' | 'gemini' | 'openai';
 
 export interface LlmProvider {
   readonly name: LlmProviderName;

@@ -217,6 +217,37 @@
         font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       }
 
+      details.attempts {
+        margin-top: 10px;
+        background: #0f1724;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 8px 10px;
+      }
+
+      details.attempts summary {
+        cursor: pointer;
+        color: var(--accent);
+        font-size: 0.85rem;
+        list-style: none;
+      }
+
+      details.attempts summary::-webkit-details-marker {
+        display: none;
+      }
+
+      details.attempts ol {
+        margin: 8px 0 0;
+        padding-left: 18px;
+        color: var(--muted);
+        font-size: 0.8rem;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+
+      details.attempts li {
+        margin: 4px 0;
+      }
+
       .composer {
         display: flex;
         gap: 8px;
@@ -545,6 +576,43 @@
         return '<div class="sources">' + items + '</div>';
       }
 
+      function renderAttempts(attempts) {
+        if (!attempts || attempts.length === 0) return '';
+        const usedFallback = attempts.length > 1;
+        const items = attempts
+          .map((a) => {
+            const reason = a.failureReason
+              ? ' — ' + escapeHtml(a.failureReason)
+              : '';
+            return (
+              '<li>#' +
+              escapeHtml(String(a.attempt)) +
+              ' ' +
+              escapeHtml(a.provider || '?') +
+              ' · ' +
+              escapeHtml(a.outcome || '?') +
+              ' · ' +
+              escapeHtml(String(a.latencyMs ?? '?')) +
+              ' ms' +
+              reason +
+              '</li>'
+            );
+          })
+          .join('');
+        return (
+          '<details class="attempts">' +
+          '<summary>Provider attempts (' +
+          attempts.length +
+          ')' +
+          (usedFallback ? ' · fallback used' : '') +
+          '</summary>' +
+          '<ol>' +
+          items +
+          '</ol>' +
+          '</details>'
+        );
+      }
+
       function setBusy(busy) {
         askBtn.disabled = busy;
         fileInput.disabled = busy;
@@ -579,7 +647,7 @@
 
           const head =
             '<table><thead><tr>' +
-            '<th>when</th><th>op</th><th>mode</th><th>topK</th>' +
+            '<th>when</th><th>op</th><th>#</th><th>outcome</th><th>provider</th><th>mode</th><th>topK</th>' +
             '<th>cost</th><th>ms</th><th>tokens</th><th>request</th>' +
             '</tr></thead><tbody>';
 
@@ -597,6 +665,17 @@
                 '</td>' +
                 '<td>' +
                 escapeHtml(row.operation || '-') +
+                '</td>' +
+                '<td>' +
+                escapeHtml(String(row.attempt ?? 1)) +
+                '</td>' +
+                '<td title="' +
+                escapeHtml(row.failureReason || '') +
+                '">' +
+                escapeHtml(row.outcome || '-') +
+                '</td>' +
+                '<td>' +
+                escapeHtml(row.provider || '-') +
                 '</td>' +
                 '<td>' +
                 escapeHtml(row.retrievalMode || '-') +
@@ -723,7 +802,7 @@
         addBubble('user', escapeHtml(question));
         questionInput.value = '';
         setBusy(true);
-        setStatus('Thinking…');
+        setStatus('Resolving via gateway…');
 
         const thinking = addBubble(
           'bot',
@@ -747,6 +826,7 @@
           thinking.innerHTML =
             escapeHtml(data.answer || '(empty answer)') +
             renderSources(data.sources) +
+            renderAttempts(data.attempts) +
             '<div class="meta">' +
             escapeHtml(mode.label) +
             ' · topK ' +

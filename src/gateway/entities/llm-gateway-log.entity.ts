@@ -13,6 +13,8 @@ import {
   RetrievalMode,
 } from '../retrieval-mode';
 
+export type GatewayAttemptOutcome = 'success' | 'timeout' | 'error';
+
 @Entity('llm_gateway_logs')
 export class LlmGatewayLogEntity {
   @PrimaryGeneratedColumn('uuid')
@@ -45,6 +47,15 @@ export class LlmGatewayLogEntity {
 
   @Column({ name: 'top_k', type: 'int', nullable: true })
   topK: number | null;
+
+  @Column({ type: 'int', default: 1 })
+  attempt: number;
+
+  @Column({ type: 'text', default: 'success' })
+  outcome: GatewayAttemptOutcome;
+
+  @Column({ name: 'failure_reason', type: 'text', nullable: true })
+  failureReason: string | null;
 
   @Column({ name: 'input_tokens', type: 'int', default: 0 })
   inputTokens: number;

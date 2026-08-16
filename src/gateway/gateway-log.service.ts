@@ -1,7 +1,10 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
-import { LlmGatewayLogEntity } from './entities/llm-gateway-log.entity';
+import {
+  GatewayAttemptOutcome,
+  LlmGatewayLogEntity,
+} from './entities/llm-gateway-log.entity';
 import {
   GatewayOperation,
   LLM_GATEWAY_OPERATION_ENUM,
@@ -22,6 +25,9 @@ export type GatewayLogInput = {
   latencyMs: number;
   retrievalMode?: RetrievalMode | null;
   topK?: number | null;
+  attempt?: number;
+  outcome?: GatewayAttemptOutcome;
+  failureReason?: string | null;
 };
 
 const CREATE_OPERATION_ENUM_SQL = `
@@ -56,6 +62,9 @@ CREATE TABLE IF NOT EXISTS llm_gateway_logs (
   model           text NOT NULL,
   retrieval_mode  ${LLM_RETRIEVAL_MODE_ENUM},
   top_k           int,
+  attempt         int NOT NULL DEFAULT 1,
+  outcome         text NOT NULL DEFAULT 'success',
+  failure_reason  text,
   input_tokens    int NOT NULL DEFAULT 0,
   output_tokens   int NOT NULL DEFAULT 0,
   cost_usd        numeric(14, 8) NOT NULL DEFAULT 0,
@@ -130,7 +139,7 @@ BEGIN
 END $$;
 `;
 
-const MIGRATE_RETRIEVAL_COLUMNS_SQL = `
+const MIGRATE_EXTRA_COLUMNS_SQL = `
 DO $$ BEGIN
   IF EXISTS (
     SELECT 1 FROM information_schema.tables
@@ -141,6 +150,15 @@ DO $$ BEGIN
 
     ALTER TABLE llm_gateway_logs
       ADD COLUMN IF NOT EXISTS top_k int;
+
+    ALTER TABLE llm_gateway_logs
+      ADD COLUMN IF NOT EXISTS attempt int NOT NULL DEFAULT 1;
+
+    ALTER TABLE llm_gateway_logs
+      ADD COLUMN IF NOT EXISTS outcome text NOT NULL DEFAULT 'success';
+
+    ALTER TABLE llm_gateway_logs
+      ADD COLUMN IF NOT EXISTS failure_reason text;
   END IF;
 END $$;
 `;
@@ -167,7 +185,7 @@ export class GatewayLogService implements OnModuleInit {
     await this.dataSource.query(CREATE_RETRIEVAL_MODE_ENUM_SQL);
     await this.dataSource.query(CREATE_TABLE_SQL);
     await this.dataSource.query(MIGRATE_OPERATION_ENUM_SQL);
-    await this.dataSource.query(MIGRATE_RETRIEVAL_COLUMNS_SQL);
+    await this.dataSource.query(MIGRATE_EXTRA_COLUMNS_SQL);
     for (const sql of CREATE_INDEXES_SQL) {
       await this.dataSource.query(sql);
     }
@@ -196,6 +214,9 @@ export class GatewayLogService implements OnModuleInit {
           model: entry.model,
           retrievalMode: entry.retrievalMode ?? null,
           topK: entry.topK ?? null,
+          attempt: entry.attempt ?? 1,
+          outcome: entry.outcome ?? 'success',
+          failureReason: entry.failureReason ?? null,
           inputTokens: entry.inputTokens,
           outputTokens: entry.outputTokens,
           costUsd: entry.costUsd.toFixed(8),

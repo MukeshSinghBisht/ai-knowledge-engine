@@ -20,7 +20,7 @@ export class GeminiProvider implements LlmProvider {
 
   constructor(private readonly configService: ConfigService) {
     this.chatModel =
-      this.configService.get<string>('GEMINI_CHAT_MODEL') ?? 'gemini-2.0-flash';
+      this.configService.get<string>('GEMINI_CHAT_MODEL') ?? 'gemini-2.5-flash-lite';
     // text-embedding-004 outputs 768 dims, matching the vector(768) column.
     this.embeddingModel =
       this.configService.get<string>('GEMINI_EMBEDDING_MODEL') ??

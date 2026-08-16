@@ -69,6 +69,7 @@ export class QueryService {
         latencyMs: 0,
         mode,
         topK,
+        attempts: [],
       };
     }
 
@@ -104,6 +105,7 @@ export class QueryService {
       latencyMs: result.latencyMs,
       mode,
       topK,
+      attempts: result.attempts,
     };
   }
 }

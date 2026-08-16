@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { TokenUsageDto } from './chat-response.dto';
+import { ProviderAttemptDto, TokenUsageDto } from './chat-response.dto';
 import { DocumentMetadataDto } from './document-metadata.dto';
 
 export class StructuredChatResponseDto {
@@ -26,4 +26,7 @@ export class StructuredChatResponseDto {
 
   @ApiProperty({ example: 1200 })
   latencyMs: number;
+
+  @ApiProperty({ type: [ProviderAttemptDto] })
+  attempts: ProviderAttemptDto[];
 }

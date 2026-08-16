@@ -103,9 +103,36 @@ Click **Gateway logs** (toolbar). Hit **Refresh** after your Simple/Thorough ask
 
 ---
 
-## 6. Closing line (~15s)
+## 6. Provider fallback (optional, ~1 min)
 
-*“RAG for correctness, gateway telemetry for cost control. Simple vs Thorough is how a product lets users trade accuracy/coverage against spend.”*
+Works **without** Gemini/OpenAI keys. In `.env`:
+
+```env
+LLM_PROVIDER=openai
+LLM_EMBEDDING_PROVIDER=ollama
+LLM_FALLBACK_ORDER=openai,ollama
+LLM_TIMEOUT_MS=45000
+LLM_MAX_ATTEMPTS=2
+OPENAI_API_KEY=
+```
+
+Restart, ask any document question in the UI.
+
+**Expect:** answer still arrives (via Ollama). Expand **Provider attempts** —
+`#1 openai · error` (key missing), then `#2 ollama · success`. Gateway logs show
+matching `attempt` / `outcome` rows. Embed stays on Ollama (`nomic-embed-text`).
+
+**Say:** *“Generate goes through an ordered fallback chain. Embeddings stay on the
+ingest provider so vector dims don’t break.”*
+
+Switch `LLM_PROVIDER` back to `ollama` for the normal cost demo so you don’t pay
+a guaranteed-fail first attempt every time.
+
+---
+
+## 7. Closing line (~15s)
+
+*“RAG for correctness, gateway telemetry for cost control. Simple vs Thorough trades coverage against spend; fallback keeps generate available when a provider flakes.”*
 
 ---
 
@@ -117,5 +144,6 @@ Click **Gateway logs** (toolbar). Hit **Refresh** after your Simple/Thorough ask
 | 2 | Thorough | Same exact question | Correct + higher cost |
 | 3 | Any | Who painted the Mona Lisa? | Grounding / refuse |
 | 4 | — | **Gateway logs** button | Telemetry + mode in UI |
+| 5 | — | Bad primary + fallback order | **Provider attempts** + log outcomes |
 
 **File to upload:** `demo/ai-knowledge-engine-handbook.pdf`

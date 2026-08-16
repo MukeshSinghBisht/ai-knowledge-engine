@@ -1,11 +1,15 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { TokenUsageDto } from '../../chat/dto/chat-response.dto';
+import {
+  ProviderAttemptDto,
+  TokenUsageDto,
+} from '../../chat/dto/chat-response.dto';
 import { SearchResultDto } from '../../documents/dto/document-response.dto';
 import { RetrievalMode } from '../../gateway/retrieval-mode';
 
 export class QueryResponseDto {
   @ApiProperty({
-    example: 'Items may be returned within 30 days of purchase with a valid receipt.',
+    example:
+      'Items may be returned within 30 days of purchase with a valid receipt.',
     description: 'Answer generated from the retrieved sources only',
   })
   answer: string;
@@ -46,7 +50,8 @@ export class QueryResponseDto {
 
   @ApiProperty({
     example: 842,
-    description: 'Generate-call wall-clock time in milliseconds (0 if no LLM call)',
+    description:
+      'Successful generate attempt wall-clock time in milliseconds (0 if no LLM call)',
   })
   latencyMs: number;
 
@@ -64,4 +69,10 @@ export class QueryResponseDto {
     description: 'Chunks retrieved as context for this query',
   })
   topK: number;
+
+  @ApiProperty({
+    type: [ProviderAttemptDto],
+    description: 'Gateway provider attempts for the generate step',
+  })
+  attempts: ProviderAttemptDto[];
 }
