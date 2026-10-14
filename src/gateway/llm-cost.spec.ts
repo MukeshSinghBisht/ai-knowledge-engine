@@ -1,8 +1,4 @@
-import {
-  calculateCostUsd,
-  parseUsdPer1M,
-  resolveCostRates,
-} from './llm-cost';
+import { calculateCostUsd, parseUsdPer1M, resolveCostRates } from './llm-cost';
 
 describe('llm-cost', () => {
   it('uses assumed Ollama token rates (same pattern as cloud)', () => {
@@ -51,6 +47,26 @@ describe('llm-cost', () => {
         rates,
       ),
     ).toBe(0.15);
+  });
+
+  it('defaults Groq costs to zero and supports configured rates', () => {
+    expect(resolveCostRates('groq')).toEqual({
+      inputUsdPer1M: 0,
+      outputUsdPer1M: 0,
+    });
+    expect(
+      resolveCostRates('groq', {
+        groqInput: '0.1',
+        groqOutput: '0.2',
+      }),
+    ).toEqual({ inputUsdPer1M: 0.1, outputUsdPer1M: 0.2 });
+  });
+
+  it('defaults Cloudflare costs to zero within the free allocation', () => {
+    expect(resolveCostRates('cloudflare')).toEqual({
+      inputUsdPer1M: 0,
+      outputUsdPer1M: 0,
+    });
   });
 
   it('falls back when env values are invalid', () => {

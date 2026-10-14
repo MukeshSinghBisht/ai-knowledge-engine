@@ -1,47 +1,52 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import {
   ChatMessage,
   ChatResult,
+  EmbeddingTaskType,
   LlmProvider,
   StructuredChatResult,
   ToolChatResult,
 } from '../llm.types';
-import { DOCUMENT_METADATA_SYSTEM_PROMPT } from '../schemas/document-metadata.schema';
+import {
+  DOCUMENT_METADATA_JSON_SCHEMA,
+  DOCUMENT_METADATA_SYSTEM_PROMPT,
+} from '../schemas/document-metadata.schema';
 
 @Injectable()
 export class GeminiProvider implements LlmProvider {
   readonly name = 'gemini' as const;
 
-  private client: GoogleGenerativeAI | null = null;
+  private client: GoogleGenAI | null = null;
   private readonly chatModel: string;
   private readonly embeddingModel: string;
 
   constructor(private readonly configService: ConfigService) {
     this.chatModel =
-      this.configService.get<string>('GEMINI_CHAT_MODEL') ?? 'gemini-2.5-flash-lite';
-    // text-embedding-004 outputs 768 dims, matching the vector(768) column.
+      this.configService.get<string>('GEMINI_CHAT_MODEL') ?? 'gemini-3.8-flash';
     this.embeddingModel =
       this.configService.get<string>('GEMINI_EMBEDDING_MODEL') ??
-      'text-embedding-004';
+      'gemini-embedding-2';
   }
 
-  private getClient(): GoogleGenerativeAI {
+  private getClient(): GoogleGenAI {
     if (this.client) {
       return this.client;
     }
 
-    const apiKey = this.configService.get<string>('GEMINI_API_KEY');
+    this.client = new GoogleGenAI({ apiKey: this.getApiKey() });
+    return this.client;
+  }
 
+  private getApiKey(): string {
+    const apiKey = this.configService.get<string>('GEMINI_API_KEY');
     if (!apiKey) {
       throw new ServiceUnavailableException(
         'GEMINI_API_KEY is not set. See docs/gemini-setup.md',
       );
     }
-
-    this.client = new GoogleGenerativeAI(apiKey);
-    return this.client;
+    return apiKey;
   }
 
   async chat(messages: ChatMessage[]): Promise<ChatResult> {
@@ -59,13 +64,21 @@ export class GeminiProvider implements LlmProvider {
         throw new ServiceUnavailableException('A user message is required');
       }
 
-      const model = this.getClient().getGenerativeModel({
-        model: this.chatModel,
-        systemInstruction: systemInstruction || undefined,
-      });
+      const input = messages
+        .filter((message) => message.role !== 'system')
+        .map(
+          (message) =>
+            `${message.role === 'assistant' ? 'Assistant' : 'User'}: ${message.content}`,
+        )
+        .join('\n\n');
 
-      const result = await model.generateContent(userMessage);
-      const reply = result.response.text();
+      const result = await this.getClient().interactions.create({
+        model: this.chatModel,
+        input,
+        system_instruction: systemInstruction || undefined,
+        store: false,
+      });
+      const reply = result.output_text;
 
       if (!reply) {
         throw new ServiceUnavailableException(
@@ -73,16 +86,16 @@ export class GeminiProvider implements LlmProvider {
         );
       }
 
-      const usage = result.response.usageMetadata;
+      const usage = result.usage;
 
       return {
         reply,
         model: this.chatModel,
         provider: this.name,
         usage: {
-          promptTokens: usage?.promptTokenCount ?? 0,
-          completionTokens: usage?.candidatesTokenCount ?? 0,
-          totalTokens: usage?.totalTokenCount ?? 0,
+          promptTokens: usage?.total_input_tokens ?? 0,
+          completionTokens: usage?.total_output_tokens ?? 0,
+          totalTokens: usage?.total_tokens ?? 0,
         },
       };
     } catch (error) {
@@ -97,24 +110,39 @@ export class GeminiProvider implements LlmProvider {
     }
   }
 
-  async chatWithTools(): Promise<ToolChatResult> {
-    throw new ServiceUnavailableException(
-      'Tool calling is not implemented for the Gemini provider yet. Set LLM_PROVIDER=ollama to use POST /chat/tools.',
+  chatWithTools(): Promise<ToolChatResult> {
+    return Promise.reject(
+      new ServiceUnavailableException(
+        'Tool calling is not implemented for the Gemini provider yet. Set LLM_PROVIDER=ollama to use POST /chat/tools.',
+      ),
     );
   }
 
-  async embed(text: string): Promise<number[]> {
+  async embed(
+    text: string,
+    taskType: EmbeddingTaskType = 'RETRIEVAL_DOCUMENT',
+  ): Promise<number[]> {
     try {
-      const model = this.getClient().getGenerativeModel({
+      const content =
+        taskType === 'RETRIEVAL_QUERY'
+          ? `task: question answering | query: ${text}`
+          : `title: none | text: ${text}`;
+      const result = await this.getClient().models.embedContent({
         model: this.embeddingModel,
+        contents: content,
+        config: { outputDimensionality: 768 },
       });
+      const vector = result.embeddings?.[0]?.values;
 
-      const result = await model.embedContent(text);
-      const vector = result.embedding?.values;
-
-      if (!vector || vector.length === 0) {
+      if (!vector || vector.some((value) => !Number.isFinite(value))) {
         throw new ServiceUnavailableException(
-          'Gemini returned an empty embedding',
+          'Gemini returned an invalid embedding response',
+        );
+      }
+
+      if (vector.length !== 768) {
+        throw new ServiceUnavailableException(
+          `Gemini returned an invalid embedding dimension; expected 768, got ${vector.length}`,
         );
       }
 
@@ -149,42 +177,18 @@ export class GeminiProvider implements LlmProvider {
         throw new ServiceUnavailableException('A user message is required');
       }
 
-      const model = this.getClient().getGenerativeModel({
+      const result = await this.getClient().interactions.create({
         model: this.chatModel,
-        systemInstruction,
-        generationConfig: {
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: SchemaType.OBJECT,
-            properties: {
-              title: { type: SchemaType.STRING },
-              language: { type: SchemaType.STRING },
-              documentType: {
-                type: SchemaType.STRING,
-                format: 'enum',
-                enum: ['policy', 'faq', 'contract', 'guide', 'other'],
-              },
-              tags: {
-                type: SchemaType.ARRAY,
-                items: { type: SchemaType.STRING },
-              },
-              indexable: { type: SchemaType.BOOLEAN },
-              confidence: { type: SchemaType.NUMBER },
-            },
-            required: [
-              'title',
-              'language',
-              'documentType',
-              'tags',
-              'indexable',
-              'confidence',
-            ],
-          },
+        input: userMessage,
+        system_instruction: systemInstruction,
+        response_format: {
+          type: 'text',
+          mime_type: 'application/json',
+          schema: DOCUMENT_METADATA_JSON_SCHEMA,
         },
+        store: false,
       });
-
-      const result = await model.generateContent(userMessage);
-      const content = result.response.text();
+      const content = result.output_text;
 
       if (!content) {
         throw new ServiceUnavailableException(
@@ -192,16 +196,16 @@ export class GeminiProvider implements LlmProvider {
         );
       }
 
-      const usage = result.response.usageMetadata;
+      const usage = result.usage;
 
       return {
         content,
         model: this.chatModel,
         provider: this.name,
         usage: {
-          promptTokens: usage?.promptTokenCount ?? 0,
-          completionTokens: usage?.candidatesTokenCount ?? 0,
-          totalTokens: usage?.totalTokenCount ?? 0,
+          promptTokens: usage?.total_input_tokens ?? 0,
+          completionTokens: usage?.total_output_tokens ?? 0,
+          totalTokens: usage?.total_tokens ?? 0,
         },
       };
     } catch (error) {

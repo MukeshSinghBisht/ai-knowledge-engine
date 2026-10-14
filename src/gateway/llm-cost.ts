@@ -17,6 +17,10 @@ export type CostEnv = {
   openaiOutput?: string;
   geminiInput?: string;
   geminiOutput?: string;
+  groqInput?: string;
+  groqOutput?: string;
+  cloudflareInput?: string;
+  cloudflareOutput?: string;
 };
 
 /**
@@ -27,6 +31,8 @@ export const DEFAULT_COST_RATES: Record<LlmProviderName, CostRates> = {
   ollama: { inputUsdPer1M: 0.02, outputUsdPer1M: 0.08 },
   openai: { inputUsdPer1M: 0.15, outputUsdPer1M: 0.6 },
   gemini: { inputUsdPer1M: 0.075, outputUsdPer1M: 0.3 },
+  groq: { inputUsdPer1M: 0, outputUsdPer1M: 0 },
+  cloudflare: { inputUsdPer1M: 0, outputUsdPer1M: 0 },
 };
 
 export function parseUsdPer1M(
@@ -66,6 +72,32 @@ export function resolveCostRates(
       outputUsdPer1M: parseUsdPer1M(
         env.openaiOutput,
         DEFAULT_COST_RATES.openai.outputUsdPer1M,
+      ),
+    };
+  }
+
+  if (provider === 'groq') {
+    return {
+      inputUsdPer1M: parseUsdPer1M(
+        env.groqInput,
+        DEFAULT_COST_RATES.groq.inputUsdPer1M,
+      ),
+      outputUsdPer1M: parseUsdPer1M(
+        env.groqOutput,
+        DEFAULT_COST_RATES.groq.outputUsdPer1M,
+      ),
+    };
+  }
+
+  if (provider === 'cloudflare') {
+    return {
+      inputUsdPer1M: parseUsdPer1M(
+        env.cloudflareInput,
+        DEFAULT_COST_RATES.cloudflare.inputUsdPer1M,
+      ),
+      outputUsdPer1M: parseUsdPer1M(
+        env.cloudflareOutput,
+        DEFAULT_COST_RATES.cloudflare.outputUsdPer1M,
       ),
     };
   }

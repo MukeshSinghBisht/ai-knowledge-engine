@@ -25,6 +25,8 @@ describe('fallback-order', () => {
 
   it('parses a single provider name with fallback', () => {
     expect(parseProviderName('openai')).toBe('openai');
+    expect(parseProviderName('groq')).toBe('groq');
+    expect(parseProviderName('cloudflare')).toBe('cloudflare');
     expect(parseProviderName('nope')).toBe('ollama');
     expect(parseProviderName(undefined, 'gemini')).toBe('gemini');
   });
@@ -36,6 +38,14 @@ describe('fallback-order', () => {
     expect(
       resolveProviderChain('ollama', ['openai', 'gemini', 'ollama'], 2),
     ).toEqual(['ollama', 'openai']);
+    expect(resolveProviderChain('groq', ['gemini'], 2)).toEqual([
+      'groq',
+      'gemini',
+    ]);
+    expect(resolveProviderChain('cloudflare', ['gemini'], 2)).toEqual([
+      'cloudflare',
+      'gemini',
+    ]);
   });
 
   it('parses positive ints with fallback', () => {

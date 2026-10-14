@@ -6,6 +6,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { join } from 'node:path';
 import { ChatModule } from './chat/chat.module';
+import { DemoAnalyticsModule } from './demo-analytics/demo-analytics.module';
 import { DocumentsModule } from './documents/documents.module';
 import { DocumentChunkEntity } from './documents/entities/document-chunk.entity';
 import { DocumentEntity } from './documents/entities/document.entity';
@@ -51,6 +52,7 @@ import { QueryModule } from './query/query.module';
       }),
     }),
     GatewayModule,
+    DemoAnalyticsModule,
     LlmModule,
     HealthModule,
     ChatModule,

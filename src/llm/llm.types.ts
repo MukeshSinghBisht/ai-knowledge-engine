@@ -1,6 +1,12 @@
 import type { RetrievalMode } from '../gateway/retrieval-mode';
 
-export type LlmProviderName = 'ollama' | 'gemini' | 'openai';
+export type LlmProviderName =
+  | 'ollama'
+  | 'gemini'
+  | 'openai'
+  | 'groq'
+  | 'cloudflare';
+export type EmbeddingTaskType = 'RETRIEVAL_DOCUMENT' | 'RETRIEVAL_QUERY';
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -69,5 +75,5 @@ export interface LlmProvider {
   chat(messages: ChatMessage[]): Promise<ChatResult>;
   chatStructured(messages: ChatMessage[]): Promise<StructuredChatResult>;
   chatWithTools(messages: ChatMessage[]): Promise<ToolChatResult>;
-  embed(text: string): Promise<number[]>;
+  embed(text: string, taskType?: EmbeddingTaskType): Promise<number[]>;
 }

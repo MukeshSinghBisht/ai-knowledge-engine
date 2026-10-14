@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Post, Req } from '@nestjs/common';
 import {
   ApiOperation,
   ApiResponse,
@@ -8,6 +8,7 @@ import {
 import { QueryDto } from './dto/query.dto';
 import { QueryResponseDto } from './dto/query-response.dto';
 import { QueryService } from './query.service';
+import type { DemoSessionRequest } from '../demo-session.middleware';
 
 @ApiTags('query')
 @Controller()
@@ -25,10 +26,15 @@ export class QueryController {
     description: 'Grounded answer with the source chunks used',
     type: QueryResponseDto,
   })
+  @ApiResponse({
+    status: 429,
+    description:
+      'Demo quota reached: up to 5 questions per browser session every 7 days',
+  })
   @ApiServiceUnavailableResponse({
     description: 'LLM or embedding provider unavailable (is Ollama running?)',
   })
-  ask(@Body() dto: QueryDto) {
-    return this.queryService.answer(dto);
+  ask(@Body() dto: QueryDto, @Req() request: DemoSessionRequest) {
+    return this.queryService.answer(dto, request.demoSessionId);
   }
 }

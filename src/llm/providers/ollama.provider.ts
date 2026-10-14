@@ -39,8 +39,7 @@ export class OllamaProvider implements LlmProvider {
       return this.client;
     }
 
-    const apiKey =
-      this.configService.get<string>('OLLAMA_API_KEY') ?? 'ollama';
+    const apiKey = this.configService.get<string>('OLLAMA_API_KEY') ?? 'ollama';
 
     this.client = new OpenAI({
       apiKey,
@@ -161,7 +160,7 @@ export class OllamaProvider implements LlmProvider {
         const response = await client.chat.completions.create({
           model: this.chatModel,
           messages: workingMessages,
-          tools: TOOL_DEFINITIONS as OpenAI.Chat.Completions.ChatCompletionTool[],
+          tools: TOOL_DEFINITIONS,
         });
 
         usage.promptTokens += response.usage?.prompt_tokens ?? 0;
@@ -198,9 +197,7 @@ export class OllamaProvider implements LlmProvider {
         }
 
         // Model wants tools: record its request, run each tool, feed results back.
-        workingMessages.push(
-          message as OpenAI.Chat.Completions.ChatCompletionMessageParam,
-        );
+        workingMessages.push(message);
 
         for (const toolCall of toolCalls) {
           if (toolCall.type !== 'function') {

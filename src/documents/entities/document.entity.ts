@@ -22,6 +22,9 @@ export class DocumentEntity {
   @Column({ name: 'content_hash', type: 'text', nullable: true })
   contentHash: string | null;
 
+  @Column({ name: 'owner_id', type: 'text', nullable: true })
+  ownerId: string | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 }
