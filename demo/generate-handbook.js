@@ -30,22 +30,22 @@ const SECTIONS = [
   {
     heading: '3. Architecture at a Glance',
     body: [
-      'Requests arrive at a NestJS HTTP layer organised into feature modules: chat, documents, query, health, and a shared llm module. Postgres with the pgvector extension stores documents and their vector embeddings. Ollama runs the language and embedding models locally, so development costs nothing and no data leaves the machine.',
+      'Requests arrive at a NestJS HTTP layer organised into feature modules: chat, documents, query, health, and a shared LLM module. PostgreSQL with the pgvector extension stores documents and their vector embeddings; the demo can use a hosted Neon database instead of a local database container. The current demo uses Cloudflare Workers AI for answer generation and Google Gemini for document and query embeddings.',
       'The design keeps ingestion (turning documents into searchable vectors) cleanly separate from querying (answering a question). This separation makes each part easy to test and reason about.',
     ],
   },
   {
     heading: '4. Language Model Providers',
     body: [
-      'The engine talks to language models through a single provider interface, so the underlying vendor can be swapped without touching business logic. Three providers are supported: Ollama, Google Gemini, and OpenAI. The active provider is chosen with the LLM_PROVIDER environment variable and defaults to Ollama.',
-      'Ollama is the default because it is free, local, and private. Gemini and OpenAI are available for higher-quality answers when an API key is supplied. This vendor-neutral approach avoids lock-in and lets the team compare models on the same task.',
+      'The engine talks to language models through a single provider interface, so the underlying vendor can be swapped without touching business logic. The supported generation providers are Ollama, Google Gemini, OpenAI, Groq, and Cloudflare Workers AI. The active answer-generation provider is selected with LLM_PROVIDER.',
+      'The current demo uses Cloudflare Workers AI with the @cf/meta/llama-3.2-3b-instruct model to generate answers. Cloudflare Workers Free currently includes a limited daily Workers AI allocation of 10,000 Neurons; it is not unlimited free inference. When the free allocation is exhausted, requests can fail. Check the current account quota and keep paid billing disabled if the demo must remain at zero cost.',
     ],
   },
   {
     heading: '5. The Embedding Model',
     body: [
       'An embedding is a list of numbers that captures the meaning of a piece of text. Texts with similar meaning end up close together in this numeric space, which is what makes semantic search possible.',
-      'This project uses the nomic-embed-text model served by Ollama, which produces vectors of 768 dimensions. The same model must be used for both storing documents and searching, because vectors from different models are not comparable. The chosen dimension, 768, is fixed in the database column definition.',
+      'The current demo uses Google Gemini Embedding 2 for both document chunks and search questions, requesting vectors with 768 dimensions to match the pgvector column. Document embeddings and query embeddings must use the same embedding model and compatible settings; vectors from different embedding models cannot be safely mixed. Cloudflare generates answers from the retrieved text and does not participate in vector search.',
     ],
   },
   {
@@ -65,7 +65,7 @@ const SECTIONS = [
   {
     heading: '8. Document Ingestion',
     body: [
-      'Documents enter the system in two ways. Raw text can be posted directly as JSON, or a file can be uploaded. File upload accepts plain text and PDF files up to ten megabytes; PDFs are parsed to text before chunking. Both paths share the same downstream pipeline of chunk, embed, and store.',
+      'Documents enter the system in two ways. Raw text can be posted directly as JSON, or a file can be uploaded. File upload accepts plain text and PDF files up to ten megabytes; extracted text is limited to 50,000 characters before chunking. Visitor uploads are isolated to a browser session, each session can store up to three documents, and uploads expire after seven days. Both paths share the same downstream pipeline of chunk, embed, and store.',
       'Ingestion is idempotent. A SHA-256 hash of the normalised text is stored with a unique constraint, so uploading identical content a second time is a no-op: the existing document is returned and nothing is embedded again. Unsupported file types, empty files, and image-only scanned PDFs are rejected with a clear error.',
     ],
   },
@@ -93,7 +93,7 @@ const SECTIONS = [
   {
     heading: '12. Data Model',
     body: [
-      'Two main tables hold the knowledge base. The documents table records the title, the full original content, the source type of text, txt, or pdf, and the content hash used for deduplication. The document_chunks table holds each chunk, its position within the document, and its 768-dimension embedding vector.',
+      'Two main tables hold the knowledge base. The documents table records the title, the full original content, the source type of text, txt, or pdf, the content hash used for deduplication, and an optional visitor-session owner. The document_chunks table holds each chunk, its position within the document, and its 768-dimension Gemini embedding vector.',
       'Chunks reference their parent document and are removed automatically if the parent is deleted, keeping the store consistent.',
     ],
   },
@@ -101,14 +101,14 @@ const SECTIONS = [
     heading: '13. Roadmap and Phases',
     body: [
       'The project is delivered in phases. Phase one covered the chat foundation, structured output, and the tool-calling demo. Phase two added pgvector storage and semantic search. Phase three delivered grounded question answering and file upload with deduplication.',
-      'Later phases are planned. Phase four introduces asynchronous ingestion using a BullMQ job queue, response caching with Redis, and per-user rate limiting. Phase five adds streaming responses so answers appear token by token. Phase six adds multi-tenant authentication with JSON Web Tokens and a full audit trail. Multi-tenant isolation and authentication are not implemented yet; they are scheduled for phase six.',
+      'The current demo includes anonymous browser-session isolation for visitor uploads, an upload limit of three documents per session, and seven-day upload expiry. This is demo isolation, not account-grade authentication. User accounts, durable multi-tenant authentication, async ingestion, response caching, and a full audit trail remain future work.',
     ],
   },
   {
     heading: '14. Non-Functional Qualities',
     body: [
       'Reliability matters as much as features. Provider or configuration errors return a 503 Service Unavailable, invalid model output returns a 502 Bad Gateway, and bad input returns a 400 Bad Request. Requests are validated against typed schemas before any work begins.',
-      'Because the default setup runs entirely on a local machine with Ollama and a Postgres container, sensitive documents never leave the developer environment, which is a strong privacy guarantee during development.',
+      'This demo sends document text to Gemini for embeddings and sends retrieved text to Cloudflare Workers AI for answer generation. Do not upload confidential or sensitive material. Gemini and Cloudflare quotas, data handling terms, and free allocations are provider-controlled and may change; check the current terms and usage before a demo.',
     ],
   },
   {
@@ -139,7 +139,7 @@ function build() {
     .fontSize(10)
     .fillColor('#888')
     .text(
-      'A retrieval-augmented generation service built with NestJS, pgvector, and Ollama.',
+      'A retrieval-augmented generation service built with NestJS, pgvector, Cloudflare Workers AI, and Gemini embeddings.',
     );
   doc.moveDown(1).fillColor('#000');
 

@@ -15,6 +15,8 @@ hooks + patterns, not a frontend rewrite. See [docs/react-interview-prep.md](./d
 
 See [docs/BRD.md](./docs/BRD.md) for requirements and [docs/ai-gateway-plan.md](./docs/ai-gateway-plan.md) for the gateway build plan.
 
+For the dated, status-tracked AI engineering roadmap (evaluations, safety, MCP, observability, and portfolio milestones), see [docs/ai-engineering-roadmap.md](./docs/ai-engineering-roadmap.md).
+
 ## Demo
 
 ![AI Knowledge Engine demo](./demo/demo.gif)
@@ -53,7 +55,7 @@ Swagger: **http://localhost:3000/docs** · Full walkthrough: [demo/README.md](./
 | NestJS CLI | 11.0.21 |
 | NestJS core | 11.1.24 |
 | TypeScript | 5.9.3 |
-| `@google/generative-ai` | 0.24.1 |
+| `@google/genai` | 2.29.0 |
 | OpenAI SDK (`openai`) | 6.39.1 |
 | `@nestjs/swagger` | 11.4.4 |
 

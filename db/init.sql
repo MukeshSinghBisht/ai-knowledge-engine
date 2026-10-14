@@ -9,19 +9,23 @@ CREATE TABLE IF NOT EXISTS documents (
   content      text NOT NULL,
   source_type  text NOT NULL DEFAULT 'text',   -- text | txt | pdf
   content_hash text,                            -- sha256 of normalized text, for idempotent re-upload
+  owner_id     text,                            -- NULL = shared sample; otherwise visitor session
   created_at   timestamptz NOT NULL DEFAULT now()
 );
 
--- Same content ingested twice is a no-op (idempotency, FR-ING-06).
-CREATE UNIQUE INDEX IF NOT EXISTS idx_documents_content_hash
-  ON documents (content_hash);
+-- Upgrade existing databases and scope duplicate detection to one visitor.
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS owner_id text;
+DROP INDEX IF EXISTS idx_documents_content_hash;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_documents_owner_content_hash
+  ON documents (owner_id, content_hash);
+CREATE INDEX IF NOT EXISTS idx_documents_owner_id ON documents (owner_id);
 
 CREATE TABLE IF NOT EXISTS document_chunks (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   document_id uuid NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
   chunk_index int NOT NULL,
   content     text NOT NULL,
-  -- 768 dims = nomic-embed-text (Ollama). Must match the embedding model.
+  -- Embedding provider is configured to return 768 dimensions.
   embedding   vector(768) NOT NULL,
   created_at  timestamptz NOT NULL DEFAULT now()
 );
@@ -76,3 +80,25 @@ CREATE INDEX IF NOT EXISTS idx_llm_gateway_logs_request_id
 
 CREATE INDEX IF NOT EXISTS idx_llm_gateway_logs_created_at
   ON llm_gateway_logs (created_at);
+
+-- Anonymous demo query quota: 5 questions per browser session, reset after 7 days.
+CREATE TABLE IF NOT EXISTS demo_query_usage (
+  session_id  text PRIMARY KEY,
+  query_count int NOT NULL DEFAULT 0,
+  expires_at  timestamptz NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_demo_query_usage_expires_at
+  ON demo_query_usage (expires_at);
+
+-- Persistent anonymous demo activity counts; stores no IP addresses or user content.
+CREATE TABLE IF NOT EXISTS demo_activity_sessions (
+  session_id         text PRIMARY KEY,
+  first_seen_at      timestamptz NOT NULL DEFAULT now(),
+  last_seen_at       timestamptz NOT NULL DEFAULT now(),
+  query_submissions  int NOT NULL DEFAULT 0,
+  upload_submissions int NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_demo_activity_sessions_last_seen_at
+  ON demo_activity_sessions (last_seen_at);

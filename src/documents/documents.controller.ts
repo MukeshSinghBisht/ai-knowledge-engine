@@ -4,6 +4,7 @@ import {
   Delete,
   HttpCode,
   Post,
+  Req,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -16,6 +17,7 @@ import {
   ApiServiceUnavailableResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import type { DemoSessionRequest } from '../demo-session.middleware';
 import { DocumentsService } from './documents.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import {
@@ -34,7 +36,7 @@ export class DocumentsController {
   @ApiOperation({
     summary: 'Store a document from raw text (chunk + embed + persist)',
     description:
-      'Splits the text into overlapping chunks, generates an embedding per chunk (Ollama nomic-embed-text), and stores them in pgvector for semantic search. Re-sending identical content is a no-op (duplicate: true).',
+      'Splits the text into overlapping chunks, generates embeddings, and stores them privately for this visitor session. Each visitor can store up to 3 documents; uploads expire after 7 days.',
   })
   @ApiResponse({
     status: 201,
@@ -44,8 +46,8 @@ export class DocumentsController {
   @ApiServiceUnavailableResponse({
     description: 'Embedding provider unavailable (is Ollama running?)',
   })
-  store(@Body() dto: CreateDocumentDto) {
-    return this.documentsService.store(dto);
+  store(@Body() dto: CreateDocumentDto, @Req() request: DemoSessionRequest) {
+    return this.documentsService.store(dto, request.demoSessionId);
   }
 
   @Post('documents/upload')
@@ -55,7 +57,7 @@ export class DocumentsController {
   @ApiOperation({
     summary: 'Upload a .txt or .pdf file (extract + chunk + embed + persist)',
     description:
-      'Extracts text from the uploaded file, then ingests it exactly like POST /documents. Max 10 MB. Identical content is not re-ingested (duplicate: true).',
+      'Extracts text from the uploaded file, then ingests it privately for this visitor session. Max 10 MB per file and 3 documents per visitor; uploads expire after 7 days.',
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -66,7 +68,7 @@ export class DocumentsController {
         file: {
           type: 'string',
           format: 'binary',
-          description: '.txt or .pdf file',
+          description: '.txt or .pdf file, maximum size 10 MB',
         },
         title: {
           type: 'string',
@@ -85,25 +87,26 @@ export class DocumentsController {
   })
   upload(
     @UploadedFile() file: Express.Multer.File,
+    @Req() request: DemoSessionRequest,
     @Body('title') title?: string,
   ) {
-    return this.documentsService.storeFile(file, title);
+    return this.documentsService.storeFile(file, request.demoSessionId, title);
   }
 
   @Delete('documents')
   @HttpCode(200)
   @ApiOperation({
-    summary: 'Delete ALL documents and chunks (demo reset)',
+    summary: 'Delete this visitor session’s uploads',
     description:
-      'Wipes every stored document and its chunks so you can start a demo from a clean slate. Destructive and irreversible — there is no per-document delete here.',
+      'Deletes only documents uploaded from this browser session. Shared sample documents and other visitors’ uploads are not affected.',
   })
   @ApiResponse({
     status: 200,
     description: 'Counts of what was deleted',
     type: WipeResponseDto,
   })
-  clearAll() {
-    return this.documentsService.clearAll();
+  clearAll(@Req() request: DemoSessionRequest) {
+    return this.documentsService.clearForSession(request.demoSessionId);
   }
 
   @Post('search')
@@ -120,7 +123,9 @@ export class DocumentsController {
   @ApiServiceUnavailableResponse({
     description: 'Embedding provider unavailable (is Ollama running?)',
   })
-  search(@Body() dto: SearchDto) {
-    return this.documentsService.search(dto);
+  search(@Body() dto: SearchDto, @Req() request: DemoSessionRequest) {
+    return this.documentsService.search(dto, {
+      sessionId: request.demoSessionId,
+    });
   }
 }

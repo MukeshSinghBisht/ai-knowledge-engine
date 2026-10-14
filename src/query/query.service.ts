@@ -1,11 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  OnModuleInit,
+} from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import { DataSource } from 'typeorm';
+import { DemoAnalyticsService } from '../demo-analytics/demo-analytics.service';
 import { DocumentsService } from '../documents/documents.service';
 import { SearchResultDto } from '../documents/dto/document-response.dto';
-import {
-  RETRIEVAL_MODE_TOP_K,
-  RetrievalMode,
-} from '../gateway/retrieval-mode';
+import { RETRIEVAL_MODE_TOP_K } from '../gateway/retrieval-mode';
 import { LlmService } from '../llm/llm.service';
 import { QueryDto } from './dto/query.dto';
 import { QueryResponseDto } from './dto/query-response.dto';
@@ -18,7 +22,7 @@ import { QueryResponseDto } from './dto/query-response.dto';
 const SYSTEM_PROMPT = [
   'You are a knowledge assistant. Answer the user question using ONLY the numbered',
   'context sources provided below. Do not use any outside knowledge.',
-  "If the answer is not contained in the sources, reply exactly: \"I don't know based on the available documents.\"",
+  'If the answer is not contained in the sources, reply exactly: "I don\'t know based on the available documents."',
   'Use the EXACT names, numbers, and terms as they appear in the sources — copy proper',
   'nouns and product/model names verbatim and do NOT paraphrase, generalize, or',
   'substitute a broader term for a specific one (for example, do not replace a specific',
@@ -27,19 +31,41 @@ const SYSTEM_PROMPT = [
   'sources themselves.',
 ].join(' ');
 
+const MAX_QUERIES_PER_SESSION = 5;
+const QUERY_QUOTA_RETENTION_DAYS = 7;
+
+const CREATE_QUERY_USAGE_TABLE_SQL = `
+CREATE TABLE IF NOT EXISTS demo_query_usage (
+  session_id  text PRIMARY KEY,
+  query_count int NOT NULL DEFAULT 0,
+  expires_at  timestamptz NOT NULL
+);
+`;
+
 @Injectable()
-export class QueryService {
+export class QueryService implements OnModuleInit {
   constructor(
     private readonly documentsService: DocumentsService,
     private readonly llmService: LlmService,
+    private readonly dataSource: DataSource,
+    private readonly demoAnalytics: DemoAnalyticsService,
   ) {}
 
-  async answer(dto: QueryDto): Promise<QueryResponseDto> {
+  async onModuleInit(): Promise<void> {
+    await this.dataSource.query(CREATE_QUERY_USAGE_TABLE_SQL);
+    await this.dataSource.query(
+      `CREATE INDEX IF NOT EXISTS idx_demo_query_usage_expires_at
+       ON demo_query_usage (expires_at)`,
+    );
+  }
+
+  async answer(dto: QueryDto, sessionId: string): Promise<QueryResponseDto> {
+    await this.demoAnalytics.recordActivity(sessionId, 'query');
+    await this.consumeQueryAllowance(sessionId);
+
     const requestId = randomUUID();
     const mode = dto.mode ?? null;
-    const topK =
-      dto.topK ??
-      (mode ? RETRIEVAL_MODE_TOP_K[mode] : 4);
+    const topK = dto.topK ?? (mode ? RETRIEVAL_MODE_TOP_K[mode] : 4);
     const callOptions = {
       requestId,
       retrievalMode: mode ?? undefined,
@@ -52,7 +78,7 @@ export class QueryService {
         query: dto.query,
         topK,
       },
-      callOptions,
+      { ...callOptions, sessionId },
     );
 
     // 2. No context found → don't call the LLM; there's nothing to ground on.
@@ -107,5 +133,37 @@ export class QueryService {
       topK,
       attempts: result.attempts,
     };
+  }
+
+  private async consumeQueryAllowance(sessionId: string): Promise<void> {
+    await this.dataSource.query(
+      'DELETE FROM demo_query_usage WHERE expires_at <= now()',
+    );
+
+    const rows = await this.dataSource.query<{ query_count: number }[]>(
+      `INSERT INTO demo_query_usage (session_id, query_count, expires_at)
+       VALUES ($1, 1, now() + interval '${QUERY_QUOTA_RETENTION_DAYS} days')
+       ON CONFLICT (session_id) DO UPDATE
+       SET query_count = CASE
+             WHEN demo_query_usage.expires_at <= now() THEN 1
+             ELSE demo_query_usage.query_count + 1
+           END,
+           expires_at = CASE
+             WHEN demo_query_usage.expires_at <= now()
+               THEN now() + interval '${QUERY_QUOTA_RETENTION_DAYS} days'
+             ELSE demo_query_usage.expires_at
+           END
+       WHERE demo_query_usage.expires_at <= now()
+          OR demo_query_usage.query_count < $2
+       RETURNING query_count`,
+      [sessionId, MAX_QUERIES_PER_SESSION],
+    );
+
+    if (rows.length === 0) {
+      throw new HttpException(
+        `Demo limit reached: you can ask up to ${MAX_QUERIES_PER_SESSION} questions per browser session. The limit resets after ${QUERY_QUOTA_RETENTION_DAYS} days.`,
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
   }
 }

@@ -134,6 +134,13 @@
         color: var(--danger);
       }
 
+      .demo-notice {
+        color: var(--muted);
+        font-size: 0.78rem;
+        line-height: 1.4;
+        text-align: center;
+      }
+
       .chat {
         flex: 1;
         background: var(--panel);
@@ -421,7 +428,9 @@
         <div>
           <h1>AI Knowledge Engine</h1>
           <p class="subtitle">
-            Upload a PDF/TXT, ask a question — answers come only from your documents.
+            Upload a PDF/TXT (10 MB max; 50,000 extracted characters; 3 files per
+            browser), then ask a question. Uploads are private to this browser (not for
+            sensitive files) and deleted after 7 days.
           </p>
         </div>
         <div class="toolbar">
@@ -432,13 +441,15 @@
           <button id="logsBtn" type="button" title="Show recent AI Gateway logs">
             Gateway logs
           </button>
-          <button id="wipe" class="danger" type="button" title="Delete all documents">
-            Wipe data
+          <button id="wipe" class="danger" type="button" title="Delete your uploads">
+            Clear my uploads
           </button>
         </div>
       </header>
 
-      <div id="status" class="status">Ready. Upload a document to begin.</div>
+      <div id="status" class="status" role="status" aria-live="polite">
+        Ready. Upload a document to begin.
+      </div>
 
       <section id="logsPanel" class="logs-panel" aria-live="polite">
         <div class="logs-head">
@@ -481,6 +492,11 @@
           <button class="primary" type="submit" id="ask">Ask</button>
         </form>
       </div>
+
+      <footer class="demo-notice">
+        Demo mode: up to 5 questions per browser session. The limit resets after
+        7 days. Upload limits apply; please don’t submit sensitive information.
+      </footer>
     </div>
 
     <script>
@@ -620,6 +636,7 @@
         logsBtn.disabled = busy;
         refreshLogsBtn.disabled = busy;
         questionInput.disabled = busy;
+        chat.setAttribute('aria-busy', String(busy));
       }
 
       function formatCost(value) {
@@ -720,10 +737,21 @@
       fileInput.addEventListener('change', async () => {
         const file = fileInput.files && fileInput.files[0];
         if (!file) return;
+        if (file.size > 10 * 1024 * 1024) {
+          setStatus('File exceeds the 10 MB limit.', 'err');
+          fileInput.value = '';
+          return;
+        }
 
         setBusy(true);
-        setStatus('Uploading “' + file.name + '”…');
+        setStatus('Uploading and indexing document…');
         addBubble('user', 'Upload: <strong>' + escapeHtml(file.name) + '</strong>');
+        const progress = addBubble(
+          'bot',
+          'Uploading and indexing ' +
+            escapeHtml(file.name) +
+            '… <span class="typing" aria-hidden="true"><span></span><span></span><span></span></span>',
+        );
 
         const body = new FormData();
         body.append('file', file);
@@ -747,13 +775,11 @@
                 ' · ' +
                 (data.sourceType || 'file');
 
-          addBubble(
-            'bot',
+          progress.innerHTML =
             escapeHtml(msg) +
               '<div class="meta">id: ' +
               escapeHtml(data.id) +
-              '</div>',
-          );
+              '</div>';
           setStatus(
             data.duplicate
               ? 'Duplicate — nothing re-embedded.'
@@ -761,7 +787,7 @@
             'ok',
           );
         } catch (err) {
-          addBubble('bot', 'Upload failed: ' + escapeHtml(err.message));
+          progress.textContent = 'Upload failed: ' + err.message;
           setStatus(err.message, 'err');
         } finally {
           fileInput.value = '';
@@ -770,22 +796,22 @@
       });
 
       wipeBtn.addEventListener('click', async () => {
-        if (!confirm('Delete ALL documents and chunks?')) return;
+        if (!confirm('Delete your uploaded documents? Shared samples are kept.')) return;
         setBusy(true);
-        setStatus('Wiping…');
+        setStatus('Clearing your uploads…');
         try {
           const res = await fetch('/documents', { method: 'DELETE' });
           const data = await res.json();
           if (!res.ok) throw new Error(data.message || 'Wipe failed');
           addBubble(
             'bot',
-            'Wiped ' +
+            'Cleared ' +
               data.deletedDocuments +
               ' document(s) and ' +
               data.deletedChunks +
               ' chunk(s).',
           );
-          setStatus('Data cleared. Upload a new document.', 'ok');
+          setStatus('Your uploads are cleared. Shared samples are still available.', 'ok');
         } catch (err) {
           addBubble('bot', 'Wipe failed: ' + escapeHtml(err.message));
           setStatus(err.message, 'err');
@@ -802,11 +828,12 @@
         addBubble('user', escapeHtml(question));
         questionInput.value = '';
         setBusy(true);
-        setStatus('Resolving via gateway…');
+        setStatus('Searching your documents and generating an answer…');
 
         const thinking = addBubble(
           'bot',
-          '<span class="typing"><span></span><span></span><span></span></span>',
+          'Searching your documents and preparing an answer… ' +
+            '<span class="typing" aria-hidden="true"><span></span><span></span><span></span></span>',
         );
 
         try {

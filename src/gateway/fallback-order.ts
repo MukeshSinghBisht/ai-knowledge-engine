@@ -4,12 +4,16 @@ export const SUPPORTED_PROVIDERS: LlmProviderName[] = [
   'ollama',
   'gemini',
   'openai',
+  'groq',
+  'cloudflare',
 ];
 
 export const DEFAULT_FALLBACK_ORDER: LlmProviderName[] = [
   'ollama',
   'gemini',
   'openai',
+  'groq',
+  'cloudflare',
 ];
 
 export const DEFAULT_TIMEOUT_MS = 10_000;
@@ -23,9 +27,7 @@ export function parseProviderName(
   return name && SUPPORTED_PROVIDERS.includes(name) ? name : fallback;
 }
 
-export function parseFallbackOrder(
-  raw: string | undefined,
-): LlmProviderName[] {
+export function parseFallbackOrder(raw: string | undefined): LlmProviderName[] {
   if (raw == null || raw.trim() === '') {
     return [...DEFAULT_FALLBACK_ORDER];
   }

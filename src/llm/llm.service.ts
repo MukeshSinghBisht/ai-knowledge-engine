@@ -16,6 +16,7 @@ import { TimeoutError, withTimeout } from '../gateway/with-timeout';
 import {
   ChatMessage,
   ChatResult,
+  EmbeddingTaskType,
   GatewayChatResult,
   GatewayStructuredChatResult,
   GatewayToolChatResult,
@@ -26,7 +27,9 @@ import {
   StructuredChatResult,
   ToolChatResult,
 } from './llm.types';
+import { CloudflareProvider } from './providers/cloudflare.provider';
 import { GeminiProvider } from './providers/gemini.provider';
+import { GroqProvider } from './providers/groq.provider';
 import { OllamaProvider } from './providers/ollama.provider';
 import { OpenAiProvider } from './providers/openai.provider';
 
@@ -41,8 +44,10 @@ export class LlmService {
   constructor(
     private readonly configService: ConfigService,
     private readonly ollamaProvider: OllamaProvider,
+    private readonly cloudflareProvider: CloudflareProvider,
     private readonly geminiProvider: GeminiProvider,
     private readonly openAiProvider: OpenAiProvider,
+    private readonly groqProvider: GroqProvider,
     private readonly gatewayLog: GatewayLogService,
   ) {
     this.providerName = parseProviderName(
@@ -113,11 +118,15 @@ export class LlmService {
   }
 
   /** Embeddings use LLM_EMBEDDING_PROVIDER (defaults to LLM_PROVIDER); no cross-provider fallback. */
-  async embed(text: string, options?: LlmCallOptions): Promise<number[]> {
+  async embed(
+    text: string,
+    options?: LlmCallOptions,
+    taskType: EmbeddingTaskType = 'RETRIEVAL_DOCUMENT',
+  ): Promise<number[]> {
     const requestId = options?.requestId ?? randomUUID();
     const started = Date.now();
     const provider = this.getProvider(this.embeddingProviderName);
-    const vector = await provider.embed(text);
+    const vector = await provider.embed(text, taskType);
     const latencyMs = Date.now() - started;
 
     this.gatewayLog.record({
@@ -144,7 +153,14 @@ export class LlmService {
     operation: Exclude<GatewayOperation, GatewayOperation.Embed>,
     run: (provider: LlmProvider) => Promise<T>,
     options?: LlmCallOptions,
-  ): Promise<T & { requestId: string; costUsd: number; latencyMs: number; attempts: ProviderAttempt[] }> {
+  ): Promise<
+    T & {
+      requestId: string;
+      costUsd: number;
+      latencyMs: number;
+      attempts: ProviderAttempt[];
+    }
+  > {
     const requestId = options?.requestId ?? randomUUID();
     const attempts: ProviderAttempt[] = [];
     const errors: string[] = [];
@@ -234,17 +250,39 @@ export class LlmService {
       openaiOutput: this.configService.get<string>('OPENAI_OUTPUT_USD_PER_1M'),
       geminiInput: this.configService.get<string>('GEMINI_INPUT_USD_PER_1M'),
       geminiOutput: this.configService.get<string>('GEMINI_OUTPUT_USD_PER_1M'),
+      groqInput: this.configService.get<string>('GROQ_INPUT_USD_PER_1M'),
+      groqOutput: this.configService.get<string>('GROQ_OUTPUT_USD_PER_1M'),
+      cloudflareInput: this.configService.get<string>(
+        'CLOUDFLARE_INPUT_USD_PER_1M',
+      ),
+      cloudflareOutput: this.configService.get<string>(
+        'CLOUDFLARE_OUTPUT_USD_PER_1M',
+      ),
     };
   }
 
   private chatModelName(provider: LlmProviderName): string {
     if (provider === 'openai') {
-      return this.configService.get<string>('OPENAI_CHAT_MODEL') ?? 'gpt-4o-mini';
+      return (
+        this.configService.get<string>('OPENAI_CHAT_MODEL') ?? 'gpt-4o-mini'
+      );
     }
     if (provider === 'gemini') {
       return (
         this.configService.get<string>('GEMINI_CHAT_MODEL') ??
-        'gemini-2.5-flash-lite'
+        'gemini-3.8-flash'
+      );
+    }
+    if (provider === 'groq') {
+      return (
+        this.configService.get<string>('GROQ_CHAT_MODEL') ??
+        'llama-3.3-70b-versatile'
+      );
+    }
+    if (provider === 'cloudflare') {
+      return (
+        this.configService.get<string>('CLOUDFLARE_CHAT_MODEL') ??
+        '@cf/meta/llama-3.2-3b-instruct'
       );
     }
     return this.configService.get<string>('OLLAMA_CHAT_MODEL') ?? 'llama3.2';
@@ -260,7 +298,7 @@ export class LlmService {
     if (provider === 'gemini') {
       return (
         this.configService.get<string>('GEMINI_EMBEDDING_MODEL') ??
-        'text-embedding-004'
+        'gemini-embedding-2'
       );
     }
     return (
@@ -277,9 +315,13 @@ export class LlmService {
         return this.geminiProvider;
       case 'openai':
         return this.openAiProvider;
+      case 'groq':
+        return this.groqProvider;
+      case 'cloudflare':
+        return this.cloudflareProvider;
       default:
         throw new ServiceUnavailableException(
-          `Unsupported LLM provider: ${name}. Use: ollama | gemini | openai`,
+          `Unsupported LLM provider: ${String(name)}. Use: ollama | gemini | openai | groq | cloudflare`,
         );
     }
   }
