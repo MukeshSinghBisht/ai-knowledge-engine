@@ -1,7 +1,7 @@
 # AI Gateway Extension — Build Plan
 
-Next work after Phase 3 (RAG). Pace across **30–45 min sessions**.
-**Gateway Phase 1 alone is a complete, demoable slice** — stop there if needed.
+Gateway telemetry and fallback are complete; the cost summary API is implemented.
+Remaining gateway work: Redis-backed per-user/API-key rate limiting. Pace across **30–45 min sessions**.
 
 Interview / resume language to match job postings:
 
@@ -11,7 +11,7 @@ Interview / resume language to match job postings:
 
 ---
 
-## Why this next
+## Why the gateway
 
 The RAG API already switches Ollama / Gemini / OpenAI. Production hiring wants the layer
 *around* those calls: **cost, latency, fallback, rate limits** — not another chat endpoint.
@@ -104,6 +104,7 @@ aggregates against `llm_gateway_logs` for the same UTC day.
 | 6 | SSE streaming RAG |
 | 7 | JWT, multi-tenant isolation, audit |
 
-Do **not** start those until Gateway Phase 1 is demoable (or you explicitly skip).
+Do **not** start those until the gateway summary is verified against live log data and
+the planned per-user/API-key quota is complete or explicitly deferred.
 
 **React interview refresh** is parallel (30 min), not a gateway blocker. See [react-interview-prep.md](./react-interview-prep.md).

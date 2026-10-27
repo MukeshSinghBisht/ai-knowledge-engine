@@ -67,7 +67,7 @@ Each row is one 30–45 minute session. Deliverables are intentionally small; a 
 ## Priority Rules
 
 1. Finish evaluation and safety checks before claiming quality improvements; use the same cases to compare changes.
-2. Complete the pending API-key quota and summary endpoint from the existing gateway plan before adding more infrastructure.
+2. Complete the pending API-key quota from the existing gateway plan before adding more infrastructure; the summary endpoint is done.
 3. Build a focused MCP demo before introducing an orchestration framework. MCP tool exposure is not the same as LLM function calling.
 4. Add LangGraph only for a workflow that benefits from explicit state and branching; do not rewrite the simple provider fallback solely for résumé keywords.
 5. Keep fine-tuning optional. Consider it only for a target role or measured use case that prompting/RAG cannot satisfy.

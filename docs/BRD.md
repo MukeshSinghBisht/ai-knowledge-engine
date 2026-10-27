@@ -12,7 +12,7 @@
 | Project | AI Knowledge Engine (`ai-knowledge-engine`) |
 | Author | Mukesh Bisht |
 | Status | Living document — updated per phase |
-| Version | 0.9 (Gateway 4.1 telemetry done — config rates + llm_gateway_logs + requestId on /chat and /query) |
+| Version | 1.0 (Gateway telemetry, fallback, and UTC cost summary implemented; per-key quota remains planned) |
 | Related | `ai-backend-engineer-roadmap/ROADMAP.md`, `ROADMAP` CHECKLIST, `docs/interview-notes.md`, `docs/ai-gateway-plan.md`, `docs/react-interview-prep.md` |
 
 **How to use this doc:** Before building a feature, open the matching requirement
@@ -102,7 +102,7 @@ image) understanding, and real-time collaborative editing are **out of scope**.
 ### 5.4 Constraints
 - Part-time build (~14–16 hrs/week); **cut scope, not interview prep** if behind.
 - Never skip the three signature capabilities: multi-tenant, async queue, streaming.
-- Next slice after RAG is **AI Gateway** (telemetry first). Do not start BullMQ until Gateway Phase 1 is demoable, unless you explicitly skip.
+- After core RAG, the next slice is the **AI Gateway**. Telemetry, fallback, and the cost summary API are implemented; finish the planned per-key quota before starting BullMQ.
 - React interview prep is **parallel** (30 min slots). Do not pause gateway work for a React rewrite.
 - API costs controlled via local Ollama, small docs, gateway logs, then caching.
 
@@ -189,18 +189,18 @@ Query:   question -> embed -> vector search top-k -> build context
 | FR-GEN-03 | M | "Don't know" behavior | **DONE.** System prompt forbids outside knowledge; verified returns "I don't know based on the available documents." |
 | FR-GEN-04 | S | Log prompt, chunks used, latency | **Moved to AI Gateway** (FR-GW-01..03). |
 
-### 7.6 AI Gateway (Phase 4 — next)
+### 7.6 AI Gateway (Phase 4)
 | ID | Priority | Requirement | Acceptance criteria |
 |----|----------|-------------|---------------------|
 | FR-GW-01 | M | All LLM calls go through one gateway function | **DONE.** `LlmService` instruments generate/tools/embed; providers are not called from controllers. |
 | FR-GW-02 | M | Per-provider cost table | **DONE.** Config rates (`OLLAMA_*` / `OPENAI_*` / `GEMINI_*_USD_PER_1M`); Ollama rates are demo assumptions. |
 | FR-GW-03 | M | Persist every call to `llm_gateway_logs` | **DONE.** provider, tokens, cost, latency, timestamp, `requestId`. |
 | FR-GW-04 | M | `requestId` traces back to the user query | **DONE.** Same id on `/query` (or `/chat`) response and log row(s); `/query` shares id across embed + generate. |
-| FR-GW-05 | M | Configurable fallback order + timeout | e.g. OpenAI → Gemini → Ollama; default timeout ~10s |
-| FR-GW-06 | M | On timeout/error, try next provider | Max attempts; stop when all fail; no infinite loop |
-| FR-GW-07 | M | Log primary vs fallback + failure reason | Log row shows which attempt succeeded and why previous failed |
+| FR-GW-05 | M | Configurable fallback order + timeout | **DONE.** `LLM_FALLBACK_ORDER`, `LLM_TIMEOUT_MS`, and bounded `LLM_MAX_ATTEMPTS`. |
+| FR-GW-06 | M | On timeout/error, try next provider | **DONE.** Retries the configured chain and returns 503 when all attempts fail. |
+| FR-GW-07 | M | Log primary vs fallback + failure reason | **DONE.** Each attempt is recorded with outcome and failure reason. |
 | FR-GW-08 | M | Per-user or API-key rate limit (Redis) | Over limit → **429** with a clear body (not a silent fail) |
-| FR-GW-09 | M | `GET /gateway/summary` cost/latency JSON | Today total cost, cost by provider, avg latency by provider |
+| FR-GW-09 | M | `GET /gateway/summary` cost/latency JSON | **DONE.** UTC-day cost and attempt totals; per-provider cost, outcome counts, and average latency. Aggregates logged attempts, including retries. |
 | FR-GW-10 | C | Summary broken down by user/tenant | Optional once FR-GW-08 (or Phase 7 tenant) exists |
 | FR-GW-11 | S | README + short demo of fallback + summary | Resume line: *AI Gateway / LLM cost & telemetry management* |
 
@@ -334,7 +334,7 @@ Track ingestion job id, status, document reference, error, timestamps.
 | DELETE | `/documents` | — | 3 | Done (wipe all — demo/dev reset utility) |
 | POST | `/search` | FR-RAG-02..04 | 2 | Done (top-k cosine) |
 | POST | `/query` | FR-GEN-01..04, FR-GW-01..04 | 3–4.1 | Done (RAG + requestId/cost/latency) |
-| GET | `/gateway/summary` | FR-GW-09..10 | 4 | Planned |
+| GET | `/gateway/summary` | FR-GW-09 | 4 | Done |
 | GET | `/jobs/:id` | FR-JOB-03 | 5 | Planned |
 | POST | `/chat/stream` | FR-STR-01 | 6 | Planned |
 | POST | `/auth/register`, `/auth/login` | FR-AUTH-01 | 7 | Planned |
@@ -353,7 +353,7 @@ LLM output, `BadRequest` (400) for input validation.
 | 1 | Demo `curl` chat + structured metadata in README ✅ |
 | 2 | Semantic search returns top-k with scores (retrieval only) ✅ (Week 3; Week 4 adds files/async ingest) |
 | 3 | Upload doc → ask question → answer + sources ✅ (core RAG via `/query`; file upload in Wk4) |
-| 4 | 4.1 telemetry ✅; then fallback demoable; 429 on rate limit; `GET /gateway/summary` |
+| 4 | Telemetry, fallback, and `GET /gateway/summary` ✅; per-key 429 rate limit remains planned |
 | 5 | Async ingestion; API non-blocking on upload |
 | 6 | Live streaming RAG demo |
 | 7 | JWT multi-tenant isolation test passes; audit log present; portfolio-ready |
@@ -389,7 +389,7 @@ LLM output, `BadRequest` (400) for input validation.
 | 1 Foundations | 1–2 | Chat + structured output | FR-CHAT-* |
 | 2 pgvector | 3–4 | Storage + semantic search + text ingest | FR-DB-*, FR-RAG-*, FR-ING-01..03 |
 | 3 Full RAG | 5–6 | Upload → answer + citations | FR-ING-04, FR-GEN-* |
-| 4 AI Gateway | next | Telemetry, fallback, rate limit, cost summary | FR-GW-* |
+| 4 AI Gateway | in progress | Telemetry, fallback, and cost summary done; per-key rate limit remains | FR-GW-* |
 | 5 Production | after GW | Async ingest, caching | FR-JOB-*, FR-CACHE-* |
 | 6 Streaming | after ingest | SSE streaming RAG | FR-STR-* |
 | 7 Enterprise | last | JWT, multi-tenant, audit, polish | FR-AUTH-*, FR-TEN-*, FR-AUD-*, FR-SEC-*, FR-DOC-* |

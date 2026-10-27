@@ -8,7 +8,7 @@ NestJS API with switchable **Ollama**, **Google Gemini**, or **OpenAI** provider
 - **Phase 1:** chat, structured output, tool/function calling
 - **Phase 2 (Week 3):** pgvector semantic search — store documents (chunk + embed) and search by meaning
 - **Phase 3:** RAG `/query` (retrieve + answer grounded in sources) and file upload (`.txt`/`.pdf`) with duplicate detection
-- **Phase 4.1 (AI Gateway telemetry):** every LLM call is logged with tokens, estimated cost, latency, and `requestId`
+- **AI Gateway:** telemetry, provider fallback, and `GET /gateway/summary` are implemented
 - **Next:** Redis-backed per-API-key quota, then RAG evaluation
 
 After that: async ingestion (BullMQ), SSE streaming, JWT multi-tenant auth.
@@ -175,7 +175,7 @@ docs/              BRD, gateway plan, deployment, provider comparison, roadmap
 ## Testing
 
 ```bash
-npm test          # unit tests (cost calc, fallback order, query service, demo analytics)
+npm test          # unit tests (gateway cost/summary, fallback order, query service, demo analytics)
 npm run test:e2e
 ```
 
