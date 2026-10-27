@@ -9,10 +9,7 @@ import {
   GatewayOperation,
   LLM_GATEWAY_OPERATION_ENUM,
 } from './gateway-operation';
-import {
-  LLM_RETRIEVAL_MODE_ENUM,
-  RetrievalMode,
-} from './retrieval-mode';
+import { LLM_RETRIEVAL_MODE_ENUM, RetrievalMode } from './retrieval-mode';
 
 export type GatewayLogInput = {
   requestId: string;
@@ -28,6 +25,35 @@ export type GatewayLogInput = {
   attempt?: number;
   outcome?: GatewayAttemptOutcome;
   failureReason?: string | null;
+};
+
+export type GatewayProviderSummary = {
+  provider: string;
+  costUsd: number;
+  averageLatencyMs: number;
+  attempts: number;
+  successfulAttempts: number;
+  failedAttempts: number;
+};
+
+export type GatewaySummary = {
+  dateUtc: string;
+  totalCostUsd: number;
+  totalAttempts: number;
+  successfulAttempts: number;
+  failedAttempts: number;
+  providers: GatewayProviderSummary[];
+};
+
+type GatewaySummaryRow = {
+  provider: string | null;
+  cost_usd: string;
+  attempts: string;
+  successful_attempts: string;
+  failed_attempts: string;
+  average_latency_ms: number | null;
+  is_total: number;
+  date_utc: string;
 };
 
 const CREATE_OPERATION_ENUM_SQL = `
@@ -202,6 +228,57 @@ export class GatewayLogService implements OnModuleInit {
       order: { createdAt: 'DESC' },
       take,
     });
+  }
+
+  async getTodaySummary(): Promise<GatewaySummary> {
+    const rows: GatewaySummaryRow[] = await this.dataSource.query(`
+      SELECT
+        provider,
+        COALESCE(SUM(cost_usd), 0)::text AS cost_usd,
+        COUNT(*)::text AS attempts,
+        COUNT(*) FILTER (WHERE outcome = 'success')::text AS successful_attempts,
+        COUNT(*) FILTER (WHERE outcome <> 'success')::text AS failed_attempts,
+        AVG(latency_ms)::float8 AS average_latency_ms,
+        GROUPING(provider)::int AS is_total,
+        to_char((NOW() AT TIME ZONE 'UTC')::date, 'YYYY-MM-DD') AS date_utc
+      FROM llm_gateway_logs
+      WHERE created_at >=
+        date_trunc('day', NOW() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
+        AND created_at <
+        (date_trunc('day', NOW() AT TIME ZONE 'UTC') + INTERVAL '1 day')
+          AT TIME ZONE 'UTC'
+      GROUP BY GROUPING SETS ((provider), ())
+      ORDER BY GROUPING(provider) DESC, provider ASC
+    `);
+
+    const total = rows.find((row) => row.is_total === 1);
+    if (!total) {
+      throw new Error('Gateway summary query did not return its total row');
+    }
+
+    return {
+      dateUtc: total.date_utc,
+      totalCostUsd: Number(total.cost_usd),
+      totalAttempts: Number(total.attempts),
+      successfulAttempts: Number(total.successful_attempts),
+      failedAttempts: Number(total.failed_attempts),
+      providers: rows
+        .filter((row) => row.is_total === 0 && row.provider !== null)
+        .flatMap((row) =>
+          row.provider === null
+            ? []
+            : [
+                {
+                  provider: row.provider,
+                  costUsd: Number(row.cost_usd),
+                  averageLatencyMs: Number(row.average_latency_ms ?? 0),
+                  attempts: Number(row.attempts),
+                  successfulAttempts: Number(row.successful_attempts),
+                  failedAttempts: Number(row.failed_attempts),
+                },
+              ],
+        ),
+    };
   }
 
   private async persist(entry: GatewayLogInput): Promise<void> {

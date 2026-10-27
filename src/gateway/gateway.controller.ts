@@ -37,4 +37,44 @@ export class GatewayController {
   listLogs(@Query() query: GatewayLogsQueryDto) {
     return this.gatewayLog.listRecent(query.limit ?? 20);
   }
+
+  @Get('summary')
+  @ApiOperation({
+    summary: "Today's AI Gateway usage summary",
+    description:
+      "Aggregates today's UTC cost and provider-attempt telemetry from llm_gateway_logs. Latency averages include successful and failed attempts.",
+  })
+  @ApiOkResponse({
+    description: "Today's usage totals and provider breakdown",
+    schema: {
+      example: {
+        dateUtc: '2026-10-27',
+        totalCostUsd: 0.0000184,
+        totalAttempts: 3,
+        successfulAttempts: 2,
+        failedAttempts: 1,
+        providers: [
+          {
+            provider: 'openai',
+            costUsd: 0.0000184,
+            averageLatencyMs: 825,
+            attempts: 2,
+            successfulAttempts: 1,
+            failedAttempts: 1,
+          },
+          {
+            provider: 'ollama',
+            costUsd: 0,
+            averageLatencyMs: 620,
+            attempts: 1,
+            successfulAttempts: 1,
+            failedAttempts: 0,
+          },
+        ],
+      },
+    },
+  })
+  getTodaySummary() {
+    return this.gatewayLog.getTodaySummary();
+  }
 }

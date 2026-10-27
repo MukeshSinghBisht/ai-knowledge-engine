@@ -6,7 +6,7 @@ NestJS API with switchable **Ollama**, **Google Gemini**, or **OpenAI** provider
 - **Phase 2 (Week 3):** pgvector semantic search — store documents (chunk + embed) and search by meaning
 - **Phase 3:** RAG `/query` (retrieve + answer grounded in sources) and file upload (`.txt`/`.pdf`) with duplicate detection
 - **Phase 4.1 (AI Gateway telemetry):** every LLM call is logged with tokens, estimated cost, latency, and `requestId`
-- **Next:** fallback → Redis rate limit → cost summary API
+- **Next:** Redis-backed per-API-key quota, then RAG evaluation
 
 After that: async ingestion (BullMQ), SSE streaming, JWT multi-tenant auth.
 
@@ -306,10 +306,10 @@ All LLM calls go through one gateway instead of hitting providers directly.
 | **4.1 Telemetry** | **Done.** Config cost table, `llm_gateway_logs`, `requestId` + cost + latency on `/chat` and `/query` |
 | **4.2 Fallback** | **Done.** Ordered retry + timeout (`LLM_FALLBACK_ORDER` / `LLM_TIMEOUT_MS`), `attempts[]` on responses, UI panel |
 | **4.3 Rate limit** | Redis counter per user/API key; **429** when over X req/min |
-| **4.4 Summary API** | `GET /gateway/summary` — cost today, by provider, avg latency (JSON only) |
+| **4.4 Summary API** | **Done.** `GET /gateway/summary` — UTC cost today, per-provider cost, attempts, outcomes, and average latency |
 | **4.5 Positioning** | README + short demo + resume line: *AI Gateway / LLM cost & telemetry management* |
 
-**4.1 alone is demoable.** Full plan: [docs/ai-gateway-plan.md](./docs/ai-gateway-plan.md).  
+Summary counts each provider attempt, including retries, and uses UTC day boundaries. Full plan: [docs/ai-gateway-plan.md](./docs/ai-gateway-plan.md).
 Recorded gateway demo: [AIKE-GATE-TELEMETRY-DEMO2.mp4](./demo/AIKE-GATE-TELEMETRY-DEMO2.mp4) · [GATEWAY-COST-DEMO.md](./demo/GATEWAY-COST-DEMO.md).
 
 ## Live walkthrough

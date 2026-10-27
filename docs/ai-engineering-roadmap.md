@@ -15,7 +15,7 @@ Status meanings: **Done** = present and demonstrable in the repository; **Partia
 | AI Gateway telemetry and provider fallback | Done | Gateway logs/cost/latency and fallback are implemented; existing gateway plan marks them complete. |
 | Global IP-based request throttling | Done | Nest throttler is registered globally in `src/app.module.ts`. |
 | Redis-backed per-API-key/user quota | Not started | This is distinct from the existing IP throttle; add identity validation before trusting a key. |
-| Gateway cost summary endpoint | Not started | Recent log listing exists; aggregate daily cost and provider latency are still needed. |
+| Gateway cost summary endpoint | Done | `GET /gateway/summary` aggregates today's UTC cost, attempts, outcomes, and average latency by provider. |
 | RAG evaluation suite | Not started | No golden dataset or repeatable evaluation runner found. |
 | Safety / prompt-injection evaluation | Not started | Add tests for untrusted retrieved text, unsupported answers, and tool permissions. |
 | Langfuse / OpenTelemetry traces | Partial | Application telemetry exists in Postgres; external trace/span integration is not present. |
@@ -43,8 +43,8 @@ Each row is one 30–45 minute session. Deliverables are intentionally small; a 
 | 2026-10-19 | Redis quota implementation | Add shared Redis counter and configuration; keep the existing IP throttle as a separate outer limit. | Not started |
 | 2026-10-21 | Quota verification | Test under-limit/over-limit behavior and expiry; return a stable 429 `rate-limit-exceeded` response. | Not started |
 | 2026-10-23 | Gateway summary query | Define the daily boundary/time zone and aggregation shape for total cost, cost by provider, and average latency. | Not started |
-| 2026-10-26 | Summary endpoint | Implement `GET /gateway/summary`; aggregate from gateway logs, not client-supplied values. | Not started |
-| 2026-10-28 | Summary tests and docs | Verify summary against seeded/logged calls; document example response and update README gateway status. | Not started |
+| 2026-10-26 | Summary endpoint | Implement `GET /gateway/summary`; aggregate from gateway logs, not client-supplied values. | Done — implemented 2026-10-27 |
+| 2026-10-28 | Summary tests and docs | Verify summary against seeded/logged calls; document example response and update README gateway status. | Done — focused tests and docs completed 2026-10-27 |
 | 2026-10-30 | MCP scope and architecture | Select read-only knowledge-base tools (for example search and document metadata); map host/client/server and data-access boundaries. | Not started |
 | 2026-11-02 | MCP server MVP | Implement a standards-based TypeScript MCP server exposing one validated read-only tool. | Not started |
 | 2026-11-04 | MCP protocol tests | Verify initialization, tool discovery, valid calls, invalid arguments, and errors with an MCP inspector/client. | Not started |
@@ -84,6 +84,7 @@ Append one line after each session. Record blockers and actual evidence; do not 
 | Date | Planned item | Outcome / evidence | Next action |
 |---|---|---|---|
 | 2026-10-01 | Initial repository audit | Telemetry/fallback and global IP throttle confirmed; Redis per-key quota, summary endpoint, eval suite, MCP, external tracing not found. Existing `.gitignore` user change left untouched. | Start session 1 on 2026-10-02. |
+| 2026-10-27 | Gateway summary API | Added UTC-day cost totals and provider attempt, outcome, and average-latency breakdown; focused gateway tests and build pass. | Design Redis-backed API-key quota identity and limit. |
 
 ### Session update template
 
