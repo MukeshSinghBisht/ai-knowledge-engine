@@ -80,6 +80,15 @@ provider.
 
 ---
 
+## Production deployment
+
+- **URL:** https://ai-knowledge-engine-wcmz.onrender.com
+- **Swagger:** https://ai-knowledge-engine-wcmz.onrender.com/docs
+- **Health:** https://ai-knowledge-engine-wcmz.onrender.com/health
+- **Stack:** Render Free (Docker) + Neon Free (Postgres/pgvector) + Cloudflare Workers AI (generation) + Gemini embeddings (768-dim)
+
+---
+
 ## Step 1 — Provision Neon Postgres with pgvector
 
 1. Create a Neon Free project and copy its connection details.

@@ -1,5 +1,8 @@
 # AI Knowledge Engine
 
+A NestJS **RAG API with an AI Gateway layer**: upload documents, ask questions, get answers grounded in your sources with citations, and see the cost, latency and provider used for every LLM call.
+
+Runs fully local (Ollama + Docker) **or** on a $0 hosted stack (Render + Neon + Cloudflare Workers AI + Gemini embeddings).
 NestJS API with switchable **Ollama**, **Google Gemini**, or **OpenAI** providers.
 
 - **Phase 1:** chat, structured output, tool/function calling
@@ -21,285 +24,162 @@ For the dated, status-tracked AI engineering roadmap (evaluations, safety, MCP, 
 
 ![AI Knowledge Engine demo](./demo/demo.gif)
 
-**RAG walkthrough:** [Full quality (MP4)](./demo/aiknowledgeenginedemo1.mp4) · [Captions (SRT)](./demo/aiknowledgeenginedemo1.srt)
+**Videos:** [RAG walkthrough](./demo/aiknowledgeenginedemo1.mp4) · [Gateway telemetry: Simple vs Thorough](./demo/AIKE-GATE-TELEMETRY-DEMO2.mp4) · [Highlight reel](./demo/upworkuploadeddocs/Upwork_Demo_HighlightAIKE.mp4)
 
-**AI Gateway telemetry (Simple vs Thorough):** [AIKE-GATE-TELEMETRY-DEMO2.mp4](./demo/AIKE-GATE-TELEMETRY-DEMO2.mp4) · script: [demo/GATEWAY-COST-DEMO.md](./demo/GATEWAY-COST-DEMO.md)
+> **Live demo:** https://ai-knowledge-engine-wcmz.onrender.com — Swagger at https://ai-knowledge-engine-wcmz.onrender.com/docs. Hosted on free tiers, so it sleeps after 15 min idle and the first load can take about a minute. Limits: 5 questions and 3 uploads per browser session.
 
-Open the built-in chat UI at **http://localhost:3000/** (upload a PDF/TXT, ask a question, see answer + sources).
+## What it does
 
-Swagger: **http://localhost:3000/docs** · Full walkthrough: [demo/README.md](./demo/README.md).
+| Capability | Details |
+|---|---|
+| **RAG** | Chunk, embed, pgvector cosine search, then answer using **only** the retrieved sources. Replies "I don't know based on the available documents" instead of guessing. |
+| **Citations** | Every answer returns its source chunks, titles and similarity scores. |
+| **Ingestion** | `.txt` / `.pdf` upload (10 MB max), content-hash **duplicate detection**, chunking. |
+| **Simple vs Thorough retrieval** | `mode=simple` retrieves top 2 chunks (cheap, fast); `mode=thorough` retrieves top 12 (more context, higher cost). |
+| **AI Gateway telemetry** | Every LLM call logs `requestId`, provider, model, tokens, estimated USD cost and latency to `llm_gateway_logs`. Viewable in the UI's Gateway logs panel. |
+| **Provider fallback** | Ordered retry across Ollama / Gemini / OpenAI / Groq / Cloudflare with per-call timeout; each response includes `attempts[]`. |
+| **Separate embedding provider** | Chat and embeddings can use different providers (`LLM_EMBEDDING_PROVIDER`). |
+| **Structured output + tools** | `/chat/structured` (validated JSON metadata), `/chat/tools` (function calling). |
+| **Public-demo safeguards** | Per-browser session isolation of uploads, 5 questions/session, 3 uploads/session, 7-day expiry, IP throttling. |
 
-## Prerequisites
+## Architecture
 
-- Node.js 20+ (this project was built with **v22.22.0**)
-- npm **10.9.7** (or compatible)
-- **Ollama** (default, local, free) — [docs/ollama-setup.md](./docs/ollama-setup.md)
-- **Docker** (for Postgres + pgvector, Phase 2+)
+```text
+ Browser UI / Swagger / curl
+          │
+          ▼
+ ┌────────────────────────── NestJS API ───────────────────────────┐
+ │  documents/  upload → extract → chunk → dedup → embed → store   │
+ │  query/      embed question → pgvector top-K → grounded prompt  │
+ │                                   │                             │
+ │  gateway/    ◄── all LLM calls ───┘                             │
+ │     • provider chain + timeout + fallback (attempts[])          │
+ │     • cost table (USD / 1M tokens) → llm_gateway_logs           │
+ │  llm/        Ollama · Gemini · OpenAI · Groq · Cloudflare       │
+ └───────────────┬──────────────────────────────┬──────────────────┘
+                 ▼                              ▼
+     PostgreSQL + pgvector               LLM / embedding providers
+  (documents, chunks, gateway logs,      (generation: Cloudflare/Ollama,
+   demo sessions & quotas)                embeddings: Gemini/Ollama)
+```
 
-## LLM providers
+Diagram image: [AI_Gateway_Architecture.png](./demo/upworkuploadeddocs/AI_Gateway_Architecture.png)
 
-| Provider | Setup doc | When to use |
-|----------|-----------|-------------|
-| **Ollama** (default) | [ollama-setup.md](./docs/ollama-setup.md) | Free local dev, full RAG path |
-| **Gemini** | [gemini-setup.md](./docs/gemini-setup.md) | Free cloud, no GPU |
-| **OpenAI** | `.env.example` | Paid, interview polish |
+## Two ways to run it
 
-**Comparison table:** [docs/llm-provider-comparison.md](./docs/llm-provider-comparison.md)
+| | Local (full control) | Hosted ($0 demo) |
+|---|---|---|
+| Generation | Ollama `llama3.2` | Cloudflare Workers AI `llama-3.2-3b-instruct` |
+| Embeddings | Ollama `nomic-embed-text` | Gemini `gemini-embedding-2` (768-dim) |
+| Database | Docker `pgvector/pgvector:pg16` | Neon Free (pgvector) |
+| App host | `npm run start:dev` | Render Free (Dockerfile) |
+| Needs | ~8 GB RAM | No local resources |
 
-## Tooling & versions
+Hosted setup guide: **[docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)**. Ollama guide: [docs/ollama-setup.md](./docs/ollama-setup.md).
 
-| Tool / package | Version |
-|----------------|---------|
-| Node.js | 22.22.0 |
-| npm | 10.9.7 |
-| NestJS CLI | 11.0.21 |
-| NestJS core | 11.1.24 |
-| TypeScript | 5.9.3 |
-| `@google/genai` | 2.29.0 |
-| OpenAI SDK (`openai`) | 6.39.1 |
-| `@nestjs/swagger` | 11.4.4 |
-
-## Setup (Ollama — default)
-
-**Full guide:** [docs/ollama-setup.md](./docs/ollama-setup.md)
+### Quick start (local)
 
 ```bash
 npm install
-cp .env.example .env   # Windows: copy .env.example .env
+cp .env.example .env           # Windows: copy .env.example .env
+docker compose up -d           # Postgres + pgvector on host port 5433
+ollama pull llama3.2 && ollama pull nomic-embed-text
 ```
 
-Install Ollama from https://ollama.com/download, then:
+Set `LLM_PROVIDER=ollama` and `LLM_EMBEDDING_PROVIDER=ollama` in `.env`, then:
 
 ```bash
-ollama pull llama3.2
-ollama pull nomic-embed-text
-```
-
-Start the database (Postgres + pgvector), then the app:
-
-```bash
-docker compose up -d      # Postgres + pgvector on host port 5433
 npm run start:dev
 ```
 
-> Note: the container maps host port **5433** (5432 is often taken by a local Postgres).
-> Change `DB_PORT` in `.env` + `docker-compose.yml` if needed.
+- UI: http://localhost:3000/
+- Swagger: http://localhost:3000/docs
 
-`.env` (default):
+### Quick start (hosted)
 
-```env
-LLM_PROVIDER=ollama
-OLLAMA_CHAT_MODEL=llama3.2
-```
+1. Create a Neon project and run [`db/init.sql`](./db/init.sql).
+2. Deploy this repo's Dockerfile on Render (Free).
+3. Set env vars (see [DEPLOYMENT.md](./docs/DEPLOYMENT.md)): `LLM_PROVIDER=cloudflare`, `LLM_EMBEDDING_PROVIDER=gemini`, API keys, `DB_*`, `DB_SSL=true`.
 
-### Switch provider
-
-```env
-LLM_PROVIDER=gemini   # + GEMINI_API_KEY
-LLM_PROVIDER=openai   # + OPENAI_API_KEY
-```
-
-Restart the server after changing `.env`.
-
-## Swagger (API docs)
-
-| Link | Description |
-|------|-------------|
-| [http://localhost:3000/docs](http://localhost:3000/docs) | **Swagger UI** |
-| [http://localhost:3000/docs-json](http://localhost:3000/docs-json) | **OpenAPI JSON** |
+> Embeddings from different models are not comparable. Re-ingest documents if you change the embedding provider.
 
 ## API
 
-### Health check
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/documents` | Ingest raw text (chunk, embed, store; duplicate-aware) |
+| POST | `/documents/upload` | Ingest a `.txt` / `.pdf` file |
+| DELETE | `/documents` | Clear your uploads |
+| POST | `/search` | Semantic search, top-K chunks by cosine similarity |
+| POST | `/query` | **RAG**: grounded answer + sources + gateway telemetry |
+| POST | `/chat` | Plain chat via the gateway |
+| POST | `/chat/structured` | Validated JSON metadata extraction |
+| POST | `/chat/tools` | Function calling |
+| GET | `/gateway/logs` | Recent gateway log rows (cost, latency, provider) |
+| GET | `/health` | Health check |
+
+### Example: ask a question
 
 ```bash
-curl http://localhost:3000/health
-```
-
-### Chat
-
-```bash
-curl -X POST http://localhost:3000/chat \
+curl -c c.txt -b c.txt -X POST http://localhost:3000/query \
   -H "Content-Type: application/json" \
-  -d "{\"message\":\"What is RAG in one sentence?\"}"
+  -d '{"query":"How long is the warranty?","mode":"simple"}'
 ```
-
-**Response:**
 
 ```json
 {
-  "reply": "...",
-  "model": "llama3.2",
-  "provider": "ollama",
-  "usage": {
-    "promptTokens": 25,
-    "completionTokens": 40,
-    "totalTokens": 65
-  },
-  "requestId": "3f1c0a8e-2b7d-4c11-9a55-8d2e1f0b7c44",
-  "costUsd": 0.0000037,
-  "latencyMs": 842
-}
-```
-
-### Structured document metadata (Week 2)
-
-Extract validated metadata from raw document text — useful before chunking/embedding in later RAG phases.
-
-```bash
-curl -X POST http://localhost:3000/chat/structured \
-  -H "Content-Type: application/json" \
-  -d "{\"text\":\"Return Policy\\n\\nItems may be returned within 30 days of purchase with receipt.\"}"
-```
-
-**Response:**
-
-```json
-{
-  "metadata": {
-    "title": "Return Policy",
-    "language": "en",
-    "documentType": "policy",
-    "tags": ["returns", "refund", "receipt"],
-    "indexable": true,
-    "confidence": 0.92
-  },
-  "model": "llama3.2",
-  "provider": "ollama",
-  "usage": {
-    "promptTokens": 120,
-    "completionTokens": 80,
-    "totalTokens": 200
-  },
-  "requestId": "3f1c0a8e-2b7d-4c11-9a55-8d2e1f0b7c44",
-  "costUsd": 0.0000088,
-  "latencyMs": 1200
-}
-```
-
-### Store a document (Week 3)
-
-Chunks the text, embeds each chunk (`nomic-embed-text`), and stores vectors in pgvector.
-
-```bash
-curl -X POST http://localhost:3000/documents \
-  -H "Content-Type: application/json" \
-  -d "{\"text\":\"Return Policy\\n\\nItems may be returned within 30 days of purchase with a valid receipt.\"}"
-```
-
-**Response:** `{ "id": "...", "title": "Return Policy", "sourceType": "text", "chunkCount": 1, "duplicate": false }`
-
-Re-sending identical content is a no-op — the response comes back with `"duplicate": true` and nothing is re-embedded.
-
-### Upload a file (.txt or .pdf)
-
-Extracts the text, then ingests it exactly like `POST /documents` (max 10 MB).
-
-```bash
-curl -X POST http://localhost:3000/documents/upload \
-  -F "file=@./policy.pdf" \
-  -F "title=Return Policy"
-```
-
-**Response:** `{ "id": "...", "title": "Return Policy", "sourceType": "pdf", "chunkCount": 12, "duplicate": false }`
-
-### Semantic search (Week 3)
-
-Embeds the query and returns the top-k most similar chunks by cosine similarity.
-
-```bash
-curl -X POST http://localhost:3000/search \
-  -H "Content-Type: application/json" \
-  -d "{\"query\":\"how many days to return an item?\",\"topK\":3}"
-```
-
-**Response:**
-
-```json
-{
-  "query": "how many days to return an item?",
-  "results": [
-    {
-      "chunkId": "...",
-      "documentId": "...",
-      "title": "Return Policy",
-      "chunkIndex": 0,
-      "content": "Return Policy Items may be returned within 30 days...",
-      "score": 0.78
-    }
-  ]
-}
-```
-
-### Ask a question (RAG)
-
-Retrieves the top-k chunks and answers **using only those chunks**, returning the sources.
-
-```bash
-curl -X POST http://localhost:3000/query \
-  -H "Content-Type: application/json" \
-  -d "{\"query\":\"How long is the guarantee on Acme products?\"}"
-```
-
-**Response:**
-
-```json
-{
-  "answer": "All Acme Electronics products come with a 2-year limited warranty covering manufacturing defects.",
+  "answer": "All products come with a 2-year limited warranty covering manufacturing defects.",
   "grounded": true,
-  "sources": [
-    { "chunkId": "...", "title": "Acme Electronics Warranty", "score": 0.72, "content": "..." }
-  ],
-  "model": "llama3.2",
-  "provider": "ollama",
+  "mode": "simple",
+  "topK": 2,
+  "sources": [{ "title": "Warranty", "score": 0.72, "content": "..." }],
+  "provider": "cloudflare",
+  "model": "@cf/meta/llama-3.2-3b-instruct",
   "usage": { "promptTokens": 485, "completionTokens": 29, "totalTokens": 514 },
-  "requestId": "3f1c0a8e-2b7d-4c11-9a55-8d2e1f0b7c44",
-  "costUsd": 0.00001202,
+  "requestId": "3f1c0a8e-...",
+  "costUsd": 0,
   "latencyMs": 842,
-  "attempts": [
-    { "attempt": 1, "provider": "ollama", "outcome": "success", "latencyMs": 842 }
-  ]
+  "attempts": [{ "attempt": 1, "provider": "cloudflare", "outcome": "success", "latencyMs": 842 }]
 }
 ```
 
-If nothing relevant is stored, it replies `"I don't know based on the available documents."` instead of guessing.
+## Configuration highlights
 
-`requestId` matches rows in `llm_gateway_logs` (embed + generate for one `/query` share the same id). Generate calls may retry providers per `LLM_FALLBACK_ORDER` / `LLM_TIMEOUT_MS`; `attempts[]` lists each try (UI: collapsed **Provider attempts**). Embeddings use `LLM_EMBEDDING_PROVIDER` (defaults to `LLM_PROVIDER`) and do not cross-provider fall back. All providers use `.env` token rates (`*_USD_PER_1M`); Ollama values are demo assumptions (local is free in reality).
+| Variable | Meaning |
+|---|---|
+| `LLM_PROVIDER` | Primary generation provider (`ollama` \| `gemini` \| `openai` \| `groq` \| `cloudflare`) |
+| `LLM_EMBEDDING_PROVIDER` | Embedding provider (defaults to `LLM_PROVIDER`) |
+| `LLM_FALLBACK_ORDER`, `LLM_MAX_ATTEMPTS`, `LLM_TIMEOUT_MS` | Fallback chain and per-call timeout |
+| `*_INPUT_USD_PER_1M`, `*_OUTPUT_USD_PER_1M` | Cost-estimate rates per provider |
+| `THROTTLE_TTL`, `THROTTLE_LIMIT` | Per-IP rate limit |
+
+Full list: [`.env.example`](./.env.example). Never commit real keys; use host env settings.
 
 ## Project structure
 
 ```text
 src/
-  chat/       POST /chat, /chat/structured, /chat/tools
-  documents/  POST /documents, /documents/upload, /search, DELETE /documents
-  query/      POST /query (RAG: retrieve + generate)
-  health/     GET /health
-  llm/        Ollama + Gemini + OpenAI providers, tools/, embeddings
-  gateway/    cost table + fallback order + llm_gateway_logs (4.1–4.2)
-db/
-  init.sql    pgvector + llm_gateway_logs
-demo/
-  README.md               step-by-step demo runbook
-  GATEWAY-COST-DEMO.md    Simple vs Thorough + gateway cost talk track
-  demo.gif                inline README preview (~2.7 MB)
-  aiknowledgeenginedemo1.mp4   RAG walkthrough
-  aiknowledgeenginedemo1.srt   captions for the RAG demo
-  AIKE-GATE-TELEMETRY-DEMO2.mp4   gateway cost / Simple vs Thorough demo
-  ai-knowledge-engine-handbook.pdf   sample doc ("ask the AI about itself")
-  generate-handbook.js    regenerates the PDF
-docker-compose.yml   Postgres 16 + pgvector
-docs/
-  BRD.md
-  ai-gateway-plan.md   next phase: telemetry, fallback, rate limits, cost summary
-  react-interview-prep.md   light React refresh via this chat UI (not a FE project)
-  ollama-setup.md
-  gemini-setup.md
-  llm-provider-comparison.md
+  chat/            /chat, /chat/structured, /chat/tools
+  documents/       ingestion, upload, search, chunking, text extraction
+  query/           /query (RAG: retrieve + generate)
+  gateway/         cost table, fallback order, timeouts, llm_gateway_logs
+  llm/             provider adapters (Ollama, Gemini, OpenAI, Groq, Cloudflare)
+  demo-analytics/  anonymous demo-session activity counts
+  health/          /health
+db/init.sql        pgvector schema + gateway logs + demo tables
+public/index.html  built-in chat UI (upload, ask, sources, gateway logs)
+demo/              walkthrough, videos, sample handbook PDF
+docs/              BRD, gateway plan, deployment, provider comparison, roadmap
 ```
 
-## Future — AI Gateway (Phase 4)
+## Testing
 
-All LLM calls go through one gateway instead of hitting providers directly.
+```bash
+npm test          # unit tests (cost calc, fallback order, query service, demo analytics)
+npm run test:e2e
+```
+
+## Status and roadmap
 
 | Slice | What it adds |
 |-------|----------------|
@@ -326,4 +206,4 @@ Gateway / cost slice: [AIKE-GATE-TELEMETRY-DEMO2.mp4](./demo/AIKE-GATE-TELEMETRY
 
 ## Related
 
-- [Learning roadmap](https://github.com/MukeshSinghBisht/ai-backend-engineer-roadmap)
+[Learning roadmap](https://github.com/MukeshSinghBisht/ai-backend-engineer-roadmap)
