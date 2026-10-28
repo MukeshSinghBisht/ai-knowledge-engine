@@ -30,6 +30,8 @@ export type GatewayLogInput = {
 export type GatewayProviderSummary = {
   provider: string;
   costUsd: number;
+  inputTokens: number;
+  outputTokens: number;
   averageLatencyMs: number;
   attempts: number;
   successfulAttempts: number;
@@ -39,15 +41,25 @@ export type GatewayProviderSummary = {
 export type GatewaySummary = {
   dateUtc: string;
   totalCostUsd: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
   totalAttempts: number;
   successfulAttempts: number;
   failedAttempts: number;
   providers: GatewayProviderSummary[];
 };
 
+export type GatewayUsageSummary = {
+  today: GatewaySummary;
+  allTime: GatewaySummary;
+};
+
 type GatewaySummaryRow = {
+  summary_period: 'today' | 'allTime';
   provider: string | null;
   cost_usd: string;
+  input_tokens: string;
+  output_tokens: string;
   attempts: string;
   successful_attempts: string;
   failed_attempts: string;
@@ -230,54 +242,83 @@ export class GatewayLogService implements OnModuleInit {
     });
   }
 
-  async getTodaySummary(): Promise<GatewaySummary> {
+  async getUsageSummary(): Promise<GatewayUsageSummary> {
     const rows: GatewaySummaryRow[] = await this.dataSource.query(`
+      WITH periods AS (
+        SELECT 'today'::text AS summary_period
+        UNION ALL
+        SELECT 'allTime'::text AS summary_period
+      ),
+      utc_day AS (
+        SELECT date_trunc('day', NOW() AT TIME ZONE 'UTC') AS start_at
+      )
       SELECT
+        periods.summary_period,
         provider,
         COALESCE(SUM(cost_usd), 0)::text AS cost_usd,
-        COUNT(*)::text AS attempts,
-        COUNT(*) FILTER (WHERE outcome = 'success')::text AS successful_attempts,
-        COUNT(*) FILTER (WHERE outcome <> 'success')::text AS failed_attempts,
+        COALESCE(SUM(input_tokens), 0)::text AS input_tokens,
+        COALESCE(SUM(output_tokens), 0)::text AS output_tokens,
+        COUNT(llm_gateway_logs.id)::text AS attempts,
+        COUNT(llm_gateway_logs.id) FILTER (WHERE outcome = 'success')::text AS successful_attempts,
+        COUNT(llm_gateway_logs.id) FILTER (WHERE outcome <> 'success')::text AS failed_attempts,
         AVG(latency_ms)::float8 AS average_latency_ms,
         GROUPING(provider)::int AS is_total,
         to_char((NOW() AT TIME ZONE 'UTC')::date, 'YYYY-MM-DD') AS date_utc
-      FROM llm_gateway_logs
-      WHERE created_at >=
-        date_trunc('day', NOW() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
-        AND created_at <
-        (date_trunc('day', NOW() AT TIME ZONE 'UTC') + INTERVAL '1 day')
-          AT TIME ZONE 'UTC'
-      GROUP BY GROUPING SETS ((provider), ())
-      ORDER BY GROUPING(provider) DESC, provider ASC
+      FROM periods
+      CROSS JOIN utc_day
+      LEFT JOIN llm_gateway_logs
+        ON periods.summary_period = 'allTime'
+        OR (
+          created_at >= utc_day.start_at AT TIME ZONE 'UTC'
+          AND created_at < (utc_day.start_at + INTERVAL '1 day') AT TIME ZONE 'UTC'
+        )
+      GROUP BY periods.summary_period, GROUPING SETS ((provider), ())
+      ORDER BY periods.summary_period, GROUPING(provider) DESC, provider ASC
     `);
 
-    const total = rows.find((row) => row.is_total === 1);
-    if (!total) {
-      throw new Error('Gateway summary query did not return its total row');
-    }
+    const buildSummary = (
+      period: GatewaySummaryRow['summary_period'],
+    ): GatewaySummary => {
+      const periodRows = rows.filter((row) => row.summary_period === period);
+      const total = periodRows.find((row) => row.is_total === 1);
+      if (!total) {
+        throw new Error(
+          `Gateway ${period} summary query did not return its total row`,
+        );
+      }
+
+      return {
+        dateUtc: total.date_utc,
+        totalCostUsd: Number(total.cost_usd),
+        totalInputTokens: Number(total.input_tokens),
+        totalOutputTokens: Number(total.output_tokens),
+        totalAttempts: Number(total.attempts),
+        successfulAttempts: Number(total.successful_attempts),
+        failedAttempts: Number(total.failed_attempts),
+        providers: periodRows
+          .filter((row) => row.is_total === 0)
+          .flatMap((row) =>
+            row.provider === null
+              ? []
+              : [
+                  {
+                    provider: row.provider,
+                    costUsd: Number(row.cost_usd),
+                    inputTokens: Number(row.input_tokens),
+                    outputTokens: Number(row.output_tokens),
+                    averageLatencyMs: Number(row.average_latency_ms ?? 0),
+                    attempts: Number(row.attempts),
+                    successfulAttempts: Number(row.successful_attempts),
+                    failedAttempts: Number(row.failed_attempts),
+                  },
+                ],
+          ),
+      };
+    };
 
     return {
-      dateUtc: total.date_utc,
-      totalCostUsd: Number(total.cost_usd),
-      totalAttempts: Number(total.attempts),
-      successfulAttempts: Number(total.successful_attempts),
-      failedAttempts: Number(total.failed_attempts),
-      providers: rows
-        .filter((row) => row.is_total === 0 && row.provider !== null)
-        .flatMap((row) =>
-          row.provider === null
-            ? []
-            : [
-                {
-                  provider: row.provider,
-                  costUsd: Number(row.cost_usd),
-                  averageLatencyMs: Number(row.average_latency_ms ?? 0),
-                  attempts: Number(row.attempts),
-                  successfulAttempts: Number(row.successful_attempts),
-                  failedAttempts: Number(row.failed_attempts),
-                },
-              ],
-        ),
+      today: buildSummary('today'),
+      allTime: buildSummary('allTime'),
     };
   }
 

@@ -40,41 +40,60 @@ export class GatewayController {
 
   @Get('summary')
   @ApiOperation({
-    summary: "Today's AI Gateway usage summary",
+    summary: "Today's and all-time AI Gateway usage summaries",
     description:
-      "Aggregates today's UTC cost and provider-attempt telemetry from llm_gateway_logs. Latency averages include successful and failed attempts.",
+      "Aggregates today's UTC and all-time cost, token, and provider-attempt telemetry from llm_gateway_logs. Latency averages include successful and failed attempts.",
   })
   @ApiOkResponse({
-    description: "Today's usage totals and provider breakdown",
+    description: "Today's and all-time usage totals and provider breakdowns",
     schema: {
       example: {
-        dateUtc: '2026-10-27',
-        totalCostUsd: 0.0000184,
-        totalAttempts: 3,
-        successfulAttempts: 2,
-        failedAttempts: 1,
-        providers: [
-          {
-            provider: 'openai',
-            costUsd: 0.0000184,
-            averageLatencyMs: 825,
-            attempts: 2,
-            successfulAttempts: 1,
-            failedAttempts: 1,
-          },
-          {
-            provider: 'ollama',
-            costUsd: 0,
-            averageLatencyMs: 620,
-            attempts: 1,
-            successfulAttempts: 1,
-            failedAttempts: 0,
-          },
-        ],
+        today: {
+          dateUtc: '2026-10-27',
+          totalCostUsd: 0.0000184,
+          totalInputTokens: 1200,
+          totalOutputTokens: 420,
+          totalAttempts: 3,
+          successfulAttempts: 2,
+          failedAttempts: 1,
+          providers: [
+            {
+              provider: 'openai',
+              costUsd: 0.0000184,
+              inputTokens: 1200,
+              outputTokens: 420,
+              averageLatencyMs: 825,
+              attempts: 2,
+              successfulAttempts: 1,
+              failedAttempts: 1,
+            },
+          ],
+        },
+        allTime: {
+          dateUtc: '2026-10-27',
+          totalCostUsd: 0.0000184,
+          totalInputTokens: 1200,
+          totalOutputTokens: 420,
+          totalAttempts: 3,
+          successfulAttempts: 2,
+          failedAttempts: 1,
+          providers: [
+            {
+              provider: 'openai',
+              costUsd: 0.0000184,
+              inputTokens: 1200,
+              outputTokens: 420,
+              averageLatencyMs: 825,
+              attempts: 2,
+              successfulAttempts: 1,
+              failedAttempts: 1,
+            },
+          ],
+        },
       },
     },
   })
-  getTodaySummary() {
-    return this.gatewayLog.getTodaySummary();
+  getUsageSummary() {
+    return this.gatewayLog.getUsageSummary();
   }
 }

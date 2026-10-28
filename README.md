@@ -37,6 +37,7 @@ For the dated, status-tracked AI engineering roadmap (evaluations, safety, MCP, 
 | **Ingestion** | `.txt` / `.pdf` upload (10 MB max), content-hash **duplicate detection**, chunking. |
 | **Simple vs Thorough retrieval** | `mode=simple` retrieves top 2 chunks (cheap, fast); `mode=thorough` retrieves top 12 (more context, higher cost). |
 | **AI Gateway telemetry** | Every LLM call logs `requestId`, provider, model, tokens, estimated USD cost and latency to `llm_gateway_logs`. Viewable in the UI's Gateway logs panel. |
+| **Usage summary** | The UI shows estimated AI spend today (UTC) and all time, with input/output tokens and a provider filter. Totals include each logged provider attempt, including retries. |
 | **Provider fallback** | Ordered retry across Ollama / Gemini / OpenAI / Groq / Cloudflare with per-call timeout; each response includes `attempts[]`. |
 | **Separate embedding provider** | Chat and embeddings can use different providers (`LLM_EMBEDDING_PROVIDER`). |
 | **Structured output + tools** | `/chat/structured` (validated JSON metadata), `/chat/tools` (function calling). |
@@ -116,6 +117,7 @@ npm run start:dev
 | POST | `/chat/structured` | Validated JSON metadata extraction |
 | POST | `/chat/tools` | Function calling |
 | GET | `/gateway/logs` | Recent gateway log rows (cost, latency, provider) |
+| GET | `/gateway/summary` | Today's UTC and all-time estimated spend, with provider breakdowns |
 | GET | `/health` | Health check |
 
 ### Example: ask a question
@@ -186,7 +188,7 @@ npm run test:e2e
 | **4.1 Telemetry** | **Done.** Config cost table, `llm_gateway_logs`, `requestId` + cost + latency on `/chat` and `/query` |
 | **4.2 Fallback** | **Done.** Ordered retry + timeout (`LLM_FALLBACK_ORDER` / `LLM_TIMEOUT_MS`), `attempts[]` on responses, UI panel |
 | **4.3 Rate limit** | Redis counter per user/API key; **429** when over X req/min |
-| **4.4 Summary API** | **Done.** `GET /gateway/summary` — UTC cost today, per-provider cost, attempts, outcomes, and average latency |
+| **4.4 Summary API and UI** | **Done.** `GET /gateway/summary` returns today and all-time totals with provider breakdowns; the UI has a provider filter |
 | **4.5 Positioning** | README + short demo + resume line: *AI Gateway / LLM cost & telemetry management* |
 
 Summary counts each provider attempt, including retries, and uses UTC day boundaries. Full plan: [docs/ai-gateway-plan.md](./docs/ai-gateway-plan.md).

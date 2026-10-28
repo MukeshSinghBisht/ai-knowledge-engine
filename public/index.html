@@ -420,6 +420,120 @@
         color: var(--muted);
         font-weight: 600;
       }
+
+      .usage-panel {
+        display: none;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 14px;
+        box-shadow: var(--shadow);
+      }
+
+      .usage-panel.open {
+        display: block;
+      }
+
+      .usage-head,
+      .usage-controls {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .usage-head {
+        margin-bottom: 12px;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .usage-controls {
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+
+      .usage-controls label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.8rem;
+      }
+
+      .usage-controls select {
+        max-width: 150px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 7px 9px;
+        background: var(--panel-2);
+        color: var(--text);
+      }
+
+      .usage-overview {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+        gap: 10px;
+        margin-bottom: 14px;
+      }
+
+      .usage-metric {
+        padding: 12px;
+        background: var(--panel-2);
+        border-radius: 10px;
+      }
+
+      .usage-metric span {
+        display: block;
+        color: var(--muted);
+        font-size: 0.75rem;
+      }
+
+      .usage-metric strong {
+        display: block;
+        margin-top: 5px;
+        font-size: 1.15rem;
+        overflow-wrap: anywhere;
+      }
+
+      .usage-table-wrap {
+        overflow-x: auto;
+      }
+
+      .usage-panel table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.8rem;
+      }
+
+      .usage-panel th,
+      .usage-panel td {
+        text-align: left;
+        padding: 8px;
+        border-bottom: 1px solid var(--border);
+        white-space: nowrap;
+      }
+
+      .usage-panel th {
+        color: var(--muted);
+        font-weight: 600;
+      }
+
+      .usage-note {
+        margin: 10px 0 0;
+        color: var(--muted);
+        font-size: 0.75rem;
+      }
+
+      @media (max-width: 640px) {
+        .usage-head {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .usage-controls {
+          justify-content: flex-start;
+        }
+      }
     </style>
   </head>
   <body>
@@ -441,6 +555,9 @@
           <button id="logsBtn" type="button" title="Show recent AI Gateway logs">
             Gateway logs
           </button>
+          <button id="usageBtn" type="button" title="Show AI usage and estimated spend">
+            Usage summary
+          </button>
           <button id="wipe" class="danger" type="button" title="Delete your uploads">
             Clear my uploads
           </button>
@@ -457,6 +574,29 @@
           <button id="refreshLogs" type="button">Refresh</button>
         </div>
         <div id="logsBody">No logs loaded yet.</div>
+      </section>
+
+      <section id="usagePanel" class="usage-panel" aria-live="polite">
+        <div class="usage-head">
+          <strong>AI usage and estimated spend</strong>
+          <div class="usage-controls">
+            <label>
+              Period
+              <select id="usagePeriod" aria-label="Usage period">
+                <option value="today">Today (UTC)</option>
+                <option value="allTime">All time</option>
+              </select>
+            </label>
+            <label>
+              Provider
+              <select id="usageProvider" aria-label="Filter by provider">
+                <option value="all">All providers</option>
+              </select>
+            </label>
+            <button id="refreshUsage" type="button">Refresh</button>
+          </div>
+        </div>
+        <div id="usageBody">Open the summary to load usage.</div>
       </section>
 
       <main id="chat" class="chat">
@@ -511,10 +651,17 @@
       const refreshLogsBtn = document.getElementById('refreshLogs');
       const logsPanel = document.getElementById('logsPanel');
       const logsBody = document.getElementById('logsBody');
+      const usageBtn = document.getElementById('usageBtn');
+      const usagePanel = document.getElementById('usagePanel');
+      const usagePeriod = document.getElementById('usagePeriod');
+      const usageProvider = document.getElementById('usageProvider');
+      const refreshUsageBtn = document.getElementById('refreshUsage');
+      const usageBody = document.getElementById('usageBody');
       const form = document.getElementById('composer');
       const questionInput = document.getElementById('question');
       const askBtn = document.getElementById('ask');
       const modeHint = document.getElementById('modeHint');
+      let usageSummary = null;
 
       const MODES = {
         simple: {
@@ -637,13 +784,20 @@
         wipeBtn.disabled = busy;
         logsBtn.disabled = busy;
         refreshLogsBtn.disabled = busy;
+        usageBtn.disabled = busy;
+        refreshUsageBtn.disabled = busy;
         questionInput.disabled = busy;
         chat.setAttribute('aria-busy', String(busy));
       }
 
       function formatCost(value) {
         const n = Number(value);
-        return Number.isFinite(n) ? '$' + n.toFixed(6) : '-';
+        return Number.isFinite(n) ? '$' + n.toFixed(8) : '-';
+      }
+
+      function formatTokens(value) {
+        const n = Number(value);
+        return Number.isFinite(n) ? n.toLocaleString() : '-';
       }
 
       function shortId(id) {
@@ -727,6 +881,141 @@
         }
       }
 
+      function renderUsageSummary() {
+        if (!usageSummary) return;
+        const periodKey = usagePeriod.value === 'allTime' ? 'allTime' : 'today';
+        const summary = usageSummary[periodKey];
+        if (!summary) {
+          usageBody.textContent = 'Usage summary is unavailable.';
+          return;
+        }
+
+        const selectedProvider = usageProvider.value;
+        const providerRows =
+          selectedProvider === 'all'
+            ? summary.providers
+            : summary.providers.filter((row) => row.provider === selectedProvider);
+        const totalCost =
+          selectedProvider === 'all'
+            ? summary.totalCostUsd
+            : providerRows.reduce((total, row) => total + row.costUsd, 0);
+        const inputTokens =
+          selectedProvider === 'all'
+            ? summary.totalInputTokens
+            : providerRows.reduce((total, row) => total + row.inputTokens, 0);
+        const outputTokens =
+          selectedProvider === 'all'
+            ? summary.totalOutputTokens
+            : providerRows.reduce((total, row) => total + row.outputTokens, 0);
+        const attempts =
+          selectedProvider === 'all'
+            ? summary.totalAttempts
+            : providerRows.reduce((total, row) => total + row.attempts, 0);
+
+        const metrics =
+          '<div class="usage-overview">' +
+          '<div class="usage-metric"><span>Estimated AI spend</span><strong>' +
+          escapeHtml(formatCost(totalCost)) +
+          '</strong></div>' +
+          '<div class="usage-metric"><span>Provider attempts</span><strong>' +
+          escapeHtml(formatTokens(attempts)) +
+          '</strong></div>' +
+          '<div class="usage-metric"><span>Input tokens</span><strong>' +
+          escapeHtml(formatTokens(inputTokens)) +
+          '</strong></div>' +
+          '<div class="usage-metric"><span>Output tokens</span><strong>' +
+          escapeHtml(formatTokens(outputTokens)) +
+          '</strong></div>' +
+          '</div>';
+
+        const table =
+          providerRows.length === 0
+            ? '<p>No provider usage for this selection yet.</p>'
+            : '<div class="usage-table-wrap"><table><thead><tr>' +
+              '<th>Provider</th><th>Estimated spend</th><th>Attempts</th>' +
+              '<th>Avg latency</th><th>Input / output tokens</th>' +
+              '</tr></thead><tbody>' +
+              providerRows
+                .map(
+                  (row) =>
+                    '<tr><td>' +
+                    escapeHtml(row.provider) +
+                    '</td><td>' +
+                    escapeHtml(formatCost(row.costUsd)) +
+                    '</td><td>' +
+                    escapeHtml(formatTokens(row.attempts)) +
+                    '</td><td>' +
+                    escapeHtml(formatTokens(Math.round(row.averageLatencyMs))) +
+                    ' ms</td><td>' +
+                    escapeHtml(
+                      formatTokens(row.inputTokens) +
+                        ' / ' +
+                        formatTokens(row.outputTokens),
+                    ) +
+                    '</td></tr>',
+                )
+                .join('') +
+              '</tbody></table></div>';
+
+        const periodLabel =
+          periodKey === 'today'
+            ? 'Today (UTC) · ' + summary.dateUtc
+            : 'All time · through ' + summary.dateUtc + ' UTC';
+        usageBody.innerHTML =
+          '<p class="usage-note">' +
+          escapeHtml(periodLabel) +
+          '</p>' +
+          metrics +
+          table +
+          '<p class="usage-note">Estimated costs are based on configured provider rates. Totals include each logged provider attempt, including retries.</p>';
+      }
+
+      function updateUsageProviderOptions() {
+        const selected = usageProvider.value;
+        const providers = Array.from(
+          new Set(
+            (usageSummary?.allTime?.providers || []).map((row) => row.provider),
+          ),
+        ).sort();
+        usageProvider.replaceChildren();
+
+        const allOption = document.createElement('option');
+        allOption.value = 'all';
+        allOption.textContent = 'All providers';
+        usageProvider.appendChild(allOption);
+
+        providers.forEach((provider) => {
+          const option = document.createElement('option');
+          option.value = provider;
+          option.textContent = provider;
+          usageProvider.appendChild(option);
+        });
+
+        usageProvider.value = providers.includes(selected) ? selected : 'all';
+      }
+
+      async function loadUsageSummary() {
+        usageBody.textContent = 'Loading usage summary…';
+        refreshUsageBtn.disabled = true;
+        try {
+          const res = await fetch('/gateway/summary');
+          if (!res.ok) {
+            const details = await res.text();
+            throw new Error(
+              details || 'Failed to load usage summary (' + res.status + ')',
+            );
+          }
+          const data = await res.json();
+          usageSummary = data;
+          updateUsageProviderOptions();
+          renderUsageSummary();
+        } catch (err) {
+          usageBody.textContent = 'Error: ' + err.message;
+        } finally {
+          refreshUsageBtn.disabled = false;
+        }
+      }
+
       logsBtn.addEventListener('click', async () => {
         const opening = !logsPanel.classList.contains('open');
         logsPanel.classList.toggle('open', opening);
@@ -735,6 +1024,17 @@
       });
 
       refreshLogsBtn.addEventListener('click', () => loadGatewayLogs());
+
+      usageBtn.addEventListener('click', async () => {
+        const opening = !usagePanel.classList.contains('open');
+        usagePanel.classList.toggle('open', opening);
+        usageBtn.textContent = opening ? 'Hide summary' : 'Usage summary';
+        if (opening) await loadUsageSummary();
+      });
+
+      refreshUsageBtn.addEventListener('click', () => loadUsageSummary());
+      usagePeriod.addEventListener('change', renderUsageSummary);
+      usageProvider.addEventListener('change', renderUsageSummary);
 
       fileInput.addEventListener('change', async () => {
         const file = fileInput.files && fileInput.files[0];

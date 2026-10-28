@@ -74,15 +74,16 @@ that show fallback; all failures → 503.
 
 ## Gateway Phase 4 — Cost dashboard / summary endpoint ✅
 
-`GET /gateway/summary` returns one JSON summary (no UI):
+`GET /gateway/summary` returns both today's (UTC) and all-time summaries. The built-in
+UI's **Usage summary** panel lets a demo viewer switch periods and filter by provider.
 
-- Total cost and attempt counts **today (UTC)**
-- Cost, attempt outcomes, and average latency **by provider**
+- Total cost, input/output token totals, and attempt counts **today (UTC) and all time**
+- Cost, token totals, attempt outcomes, and average latency **by provider**
 - Latency averages include failed attempts; costs sum each recorded provider attempt, including retries
 - Optional: cost **by user/tenant** if Phase 3 is in place
 
-**Verified by:** querying `GET /gateway/summary` after `/query` calls and comparing its
-aggregates against `llm_gateway_logs` for the same UTC day.
+**Verified by:** opening the UI summary after `/query` calls and comparing its daily and
+all-time aggregates against `llm_gateway_logs`.
 
 ---
 
