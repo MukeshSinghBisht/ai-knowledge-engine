@@ -74,7 +74,7 @@ Diagram image: [AI_Gateway_Architecture.png](./demo/upworkuploadeddocs/AI_Gatewa
 | Embeddings | Ollama `nomic-embed-text` | Gemini `gemini-embedding-2` (768-dim) |
 | Database | Docker `pgvector/pgvector:pg16` | Neon Free (pgvector) |
 | App host | `npm run start:dev` | Render Free (Dockerfile) |
-| Needs | ~8 GB RAM | No local resources |
+| Needs | Several GB of free RAM | No local resources |
 
 Hosted setup guide: **[docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)**. Ollama guide: [docs/ollama-setup.md](./docs/ollama-setup.md).
 

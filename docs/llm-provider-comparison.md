@@ -22,8 +22,8 @@ Which API to use for this project and the **12-week AI backend roadmap**.
 ## Default: Ollama
 
 The example configuration defaults to **Ollama** (`LLM_PROVIDER=ollama`) — free, local,
-chat + embeddings. For an 8 GB machine or a hosted demo, use Gemini to avoid local
-inference.
+chat + embeddings. For a low-memory machine or a hosted demo, use cloud providers
+(Cloudflare, Gemini) to avoid local inference.
 
 See [ollama-setup.md](./ollama-setup.md).
 
