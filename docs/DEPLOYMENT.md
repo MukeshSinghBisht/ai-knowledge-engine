@@ -6,13 +6,14 @@ LinkedIn/YouTube demo or a portfolio link.
 ## Why the cloud setup differs from local
 
 Locally the app uses **Ollama** for both chat and embeddings. Ollama needs several GB
-of RAM and can't run on cheap/free hosting tiers. The hosted version uses Google Gemini,
-so model inference does not use your computer's RAM. The current embedding integration
-uses `gemini-embedding-2` with output dimensionality set to 768 to match `vector(768)`.
+of RAM and can't run on cheap/free hosting tiers. The hosted version uses Cloudflare
+Workers AI for generation and Google Gemini for embeddings, so no model runs on your own
+hardware. The embedding integration uses `gemini-embedding-2` with output dimensionality
+set to 768 to match `vector(768)`.
 
 | Concern          | Local                                   | Hosted                              |
 | ---------------- | --------------------------------------- | ----------------------------------- |
-| LLM + embeddings | Ollama (`llama3.2`, `nomic-embed-text`) | Gemini API (model IDs configurable) |
+| LLM + embeddings | Ollama (`llama3.2`, `nomic-embed-text`) | Cloudflare Workers AI (generation) + Gemini API (embeddings) |
 | Postgres         | Docker container                        | Managed (Neon / Supabase)           |
 | SSL to DB        | off                                     | on (`DB_SSL=true`)                  |
 
@@ -20,16 +21,17 @@ uses `gemini-embedding-2` with output dimensionality set to 768 to match `vector
 
 - **Database:** [Neon Free](https://neon.com/pricing), with pgvector enabled.
 - **App:** [Render Free](https://render.com/docs/free), deploying this repo's Dockerfile.
-- **LLM and embeddings:** Google Gemini API's free tier, with a Gemini-only provider chain.
+- **Generation:** Cloudflare Workers AI free tier (`LLM_FALLBACK_ORDER=cloudflare`, single attempt).
+- **Embeddings:** Google Gemini API free tier (`gemini-embedding-2`, 768-dim).
 
-This avoids running Ollama or Postgres on your 8 GB machine. The app is public while
+This avoids running Ollama or Postgres locally. The app is public while
 deployed, but free services can sleep, have strict quotas, or change their terms. Render
 free web services sleep after 15 minutes without traffic; the first visit after that can
 take about a minute to wake. Neon Free currently scales compute to zero after inactivity
 and includes a bounded amount of compute/storage/egress. Confirm the current provider
 limits before deployment; free-tier availability is not an uptime or cost guarantee.
 
-For a hard $0 budget, do not attach a payment method or enable a paid Gemini tier. If a
+For a hard $0 budget, do not attach a payment method or enable a paid Gemini or Cloudflare tier. If a
 provider requires payment details to deploy, stop and choose another free option. When a
 free quota is exhausted, the demo should return an error rather than fall back to a paid
 provider.
@@ -156,14 +158,17 @@ Swagger is live at `https://<your-app>/docs`.
 
 - **Rate limiting is on.** Use a conservative `THROTTLE_LIMIT` on a public app to protect
   the free API quota; it is not a per-account abuse-prevention system.
-- **Free tiers sleep.** Tell visitors the first request after inactivity can be slow.
+- **Free tiers sleep.** Tell visitors the first request after inactivity can be slow. The
+  GitHub Actions workflow `.github/workflows/keep-alive.yml` pings `/health` every 10 minutes
+  to reduce cold starts; check the Actions tab to confirm it is running.
 - **Embeddings must match.** If you ingested locally with Ollama (`nomic-embed-text`) and
   query in the cloud with Gemini, vectors won't be comparable. Re-ingest documents in the
   environment you'll query from. Use the current Gemini embedding model configured above.
-- **Cost control.** Set only Gemini as the provider and do not configure paid-provider
-  credentials or a fallback to Ollama/OpenAI. Check Gemini's current free-tier quotas;
-  quotas and available models change over time.
-- **Don't expose Ollama.** There's no need to host Ollama; the cloud build uses Gemini only.
+- **Cost control.** Use only free-tier providers (Cloudflare for generation, Gemini for
+  embeddings), keep `LLM_FALLBACK_ORDER` to a free provider, and do not configure paid-provider
+  credentials. Check the current free-tier quotas; quotas and available models change over time.
+- **Don't expose Ollama.** There's no need to host Ollama; the cloud build uses Cloudflare
+  Workers AI and Gemini.
 
 ## Troubleshooting
 

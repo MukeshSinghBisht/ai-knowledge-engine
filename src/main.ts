@@ -26,11 +26,11 @@ async function bootstrap() {
   const swaggerConfig = new DocumentBuilder()
     .setTitle('AI Knowledge Engine')
     .setDescription(
-      'RAG API with AI Gateway telemetry. Providers: Ollama (default) | Gemini | OpenAI. Set LLM_PROVIDER in .env.',
+      'RAG API with AI Gateway telemetry. Providers: Ollama (local default) | Gemini | OpenAI | Groq | Cloudflare. Set LLM_PROVIDER (and LLM_EMBEDDING_PROVIDER) in .env.',
     )
     .setVersion('0.1.0')
     .addTag('health', 'Service health')
-    .addTag('chat', 'LLM chat completions (Gemini or OpenAI)')
+    .addTag('chat', 'LLM chat completions (any configured provider)')
     .addTag('documents', 'Document ingestion + semantic search (pgvector)')
     .addTag('query', 'RAG: ask questions answered from stored documents')
     .addTag('gateway', 'AI Gateway telemetry (cost / latency logs)')
