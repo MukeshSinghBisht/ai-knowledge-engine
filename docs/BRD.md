@@ -12,7 +12,7 @@
 | Project | AI Knowledge Engine (`ai-knowledge-engine`) |
 | Author | Mukesh Bisht |
 | Status | Living document — updated per phase |
-| Version | 1.1 (2026-11-03). Adds the Product track (§15), aligns the BRD with the hosted $0 stack and demo safeguards, and adds evaluation/safety requirements. v1.0 gateway status unchanged: telemetry, fallback and UTC cost summary done; Redis per-key quota planned. |
+| Version | 1.2 (2026-11-04). Adds the evaluation pipeline (§7.10) and a read-only MCP server (§7.11), with a delivery plan in `docs/plan-evals-and-mcp.md`. Previous: 1.1 (2026-11-03). Adds the Product track (§15), aligns the BRD with the hosted $0 stack and demo safeguards, and adds evaluation/safety requirements. v1.0 gateway status unchanged: telemetry, fallback and UTC cost summary done; Redis per-key quota planned. |
 | Related | `ai-backend-engineer-roadmap/ROADMAP.md`, `ROADMAP` CHECKLIST, `docs/interview-notes.md`, `docs/ai-gateway-plan.md`, `docs/react-interview-prep.md` |
 
 **How to use this doc:** Before building a feature, open the matching requirement
@@ -62,6 +62,7 @@ citations, tenant isolation, and production-grade ingestion/caching.
 | OBJ-7 | Measure answer quality with a repeatable evaluation set (hit rate, answer support, latency, cost), not by feel. |
 | OBJ-8 | Run a safe public demo on free tiers: per-session isolation, quotas, throttling, and documented limits. |
 | OBJ-9 | Validate real demand (usage and paid conversion) with one niche audience before building more platform. |
+| OBJ-10 | Expose the knowledge base to MCP clients through a small, read-only, validated MCP server (local stdio first). |
 
 ### 3.4 Non-goals
 Training/fine-tuning models, building a full frontend product, non-text media (audio/
@@ -94,7 +95,8 @@ WhatsApp channel is *in* scope for the Product track (§15); a custom-built chat
 - JWT auth, multi-tenant isolation, audit logging.
 - Public-demo safeguards: anonymous per-browser sessions, per-session quotas, IP throttling, 7-day expiry.
 - Hosted $0 deployment (Render + Neon + Cloudflare Workers AI + Gemini embeddings) with a keep-alive workflow.
-- Evaluation and safety testing (golden question set, prompt-injection and unsupported-answer cases).
+- Evaluation pipeline (§7.10): golden question set, repeatable runner, retrieval/answer/latency/cost report, prompt-injection and unsupported-answer cases.
+- Read-only MCP server (§7.11) wrapping search and grounded query; local stdio first.
 - Product track (§15): WhatsApp channel, unanswered-question log, human handoff, light access limits.
 
 ### 5.2 Out of scope (v1)
@@ -246,6 +248,38 @@ Query:   question -> embed -> vector search top-k -> build context
 | FR-SEC-01 | S | Hardened input validation | File size/type limits, timeouts |
 | FR-DOC-01 | M | Swagger/OpenAPI for all endpoints | `/docs` documents every route |
 
+### 7.10 Evaluation & safety pipeline (Phase 4b)
+> Goal: measure quality with the same cases every time, so changes (model, top-K, prompt, chunking) are compared with numbers, not feel.
+
+| ID | Priority | Requirement | Acceptance criteria |
+|----|----------|-------------|---------------------|
+| FR-EVAL-01 | M | Golden dataset in `evals/golden.jsonl` | 20–30 cases: `id`, `question`, `expected_doc`, `must_contain[]`, `should_refuse`, `category` (exact-term, paraphrase, multi-chunk, no-answer, Hindi/Hinglish). Built from the handbook/sample documents and real user questions. |
+| FR-EVAL-02 | M | Runner `evals/run.ts` | Calls `/query` for each case in Simple and Thorough modes; saves a timestamped JSON + Markdown report in `evals/results/`. |
+| FR-EVAL-03 | M | Retrieval hit rate | Share of cases where the expected document/chunk appears in `sources[]`. |
+| FR-EVAL-04 | M | Answer support | Share of answerable cases whose answer contains every `must_contain` term, and of `should_refuse` cases that return the exact "I don't know" reply. |
+| FR-EVAL-05 | M | Latency and cost | p50/p95 latency and cost per question, joined from `llm_gateway_logs` by `requestId`. |
+| FR-EVAL-06 | S | Failure labelling | Each miss labelled retrieval failure vs generation failure in the report. |
+| FR-EVAL-07 | S | Baseline comparison | Report shows the delta against the previous saved run. |
+| FR-SAFE-01 | M | Prompt-injection tests | Uploaded text that says "ignore previous instructions" does not change behavior; runs as a Jest test. |
+| FR-SAFE-02 | M | Unsupported-answer tests | Out-of-scope questions return the exact "I don't know based on the available documents." reply. |
+| FR-SAFE-03 | S | Tool-permission test | The MCP server (and any tool) exposes no write or delete capability. |
+
+Notes: evaluation runs against a dedicated visitor session or a local database, never the public demo quota; judge-model (LLM-as-judge) scoring is optional and added only after the rule-based checks above work.
+
+### 7.11 MCP server (Phase 4d)
+> Goal: let MCP clients (for example Claude Desktop or Cursor) query the knowledge base. MCP is a different mechanism from the LLM function calling in FR-TOOL-01.
+
+| ID | Priority | Requirement | Acceptance criteria |
+|----|----------|-------------|---------------------|
+| FR-MCP-01 | M | Standards-based TypeScript MCP server | Built on the official MCP SDK; runs over local **stdio**; responds correctly to initialize and tool discovery. |
+| FR-MCP-02 | M | Tool `search_documents(query, topK)` | Validated arguments (topK 1–12); returns chunks with scores and source metadata. |
+| FR-MCP-03 | M | Tool `ask_knowledge_base(question, mode)` | Reuses the existing grounded query flow; returns answer, sources, `grounded` flag and `requestId`. |
+| FR-MCP-04 | S | Tools `list_documents()` and `gateway_summary()` | Read-only metadata and the cost/latency summary. |
+| FR-MCP-05 | M | Read-only and validated | No upload, delete or write tools; invalid arguments return clear MCP errors, never stack traces. |
+| FR-MCP-06 | M | Calls go through existing services | No direct SQL or provider calls; gateway logs record MCP-originated calls with `requestId`. |
+| FR-MCP-07 | S | Protocol tests | Tests for initialize, tool discovery, valid call, invalid arguments and error paths (using an MCP client or inspector). |
+| FR-MCP-08 | C | Remote transport | Out of scope until authentication and per-client quotas (FR-GW-08b) exist; document that hosted multi-client support is **not** claimed. |
+
 ---
 
 ## 8. Non-functional requirements
@@ -360,6 +394,7 @@ Track ingestion job id, status, document reference, error, timestamps.
 | GET | `/gateway/summary` | FR-GW-09 | 4 | Done |
 | GET | `/gateway/logs` | FR-GW-12 | 4 | Done |
 | POST | `/webhooks/whatsapp` | FR-WA-01..04 | P1 | Planned |
+| — | MCP server (stdio): `search_documents`, `ask_knowledge_base`, `list_documents`, `gateway_summary` | FR-MCP-01..07 | 4d | Planned |
 | GET | `/admin/unanswered` | FR-INS-01 | P2 | Planned |
 | GET | `/jobs/:id` | FR-JOB-03 | 5 | Planned |
 | POST | `/chat/stream` | FR-STR-01 | 6 | Planned |
@@ -380,7 +415,8 @@ LLM output, `BadRequest` (400) for input validation.
 | 2 | Semantic search returns top-k with scores (retrieval only) ✅ (Week 3; Week 4 adds files/async ingest) |
 | 3 | Upload doc → ask question → answer + sources ✅ (core RAG via `/query`; file upload in Wk4) |
 | 4 | Telemetry, fallback, and `GET /gateway/summary` ✅; per-key 429 rate limit remains planned |
-| 4b | Evaluation set + runner report hit rate, answer support, latency, cost; injection/unsupported-answer tests pass |
+| 4b | Evaluation set + runner report hit rate, answer support, latency, cost; injection/unsupported-answer tests pass; a saved baseline report exists |
+| 4d | An MCP client discovers and calls the read-only tools over stdio; protocol tests pass; short demo recorded |
 | P1 | A real user can ask a question on WhatsApp and get a cited answer or an honest "I don't know" |
 | P2 | Unanswered-question log reviewed weekly; product metrics (§15.5) collected for 4 weeks |
 | 5 | Async ingestion; API non-blocking on upload |
@@ -413,6 +449,8 @@ LLM output, `BadRequest` (400) for input validation.
 | RSK-10 | Free-tier limits and cold starts hurt the public demo | Keep-alive workflow, documented limits, quotas, cost visible in `/gateway/summary` |
 | RSK-11 | Small model gives weak answers in Hindi/Hinglish | Test with a real-question golden set (FR-EVAL-01); upgrade model or provider if hit rate is low |
 | RSK-12 | Paid content copied and shared once sold | Price for leakage; value comes from the assistant and updates, not only the file |
+| RSK-13 | MCP server exposes more than intended, or is mistaken for hosted multi-client support | Read-only tools only (FR-MCP-05), stdio first, explicit limitation in README (FR-MCP-08) |
+| RSK-14 | Eval set too small or written by the builder, so scores look better than reality | Include real user questions and no-answer cases; grow the set from the unanswered-question log |
 
 ---
 
@@ -424,7 +462,8 @@ LLM output, `BadRequest` (400) for input validation.
 | 2 pgvector | 3–4 | Storage + semantic search + text ingest | FR-DB-*, FR-RAG-*, FR-ING-01..03 |
 | 3 Full RAG | 5–6 | Upload → answer + citations | FR-ING-04, FR-GEN-* |
 | 4 AI Gateway | in progress | Telemetry, fallback, and cost summary done; per-key rate limit remains | FR-GW-* |
-| 4b Quality & safety | next | Golden-set evaluation, injection tests | FR-EVAL-*, FR-SAFE-* |
+| 4b Quality & safety | next | Golden-set evaluation pipeline, injection tests | FR-EVAL-*, FR-SAFE-* (§7.10) |
+| 4d MCP server | after 4b | Read-only MCP server over stdio | FR-MCP-* (§7.11); plan in `docs/plan-evals-and-mcp.md` |
 | P1 WhatsApp | after 4b | WhatsApp channel for the first audience | FR-WA-*, FR-ACC-* |
 | P2 Feedback loop | after P1 | Unanswered log, human handoff, weekly metrics | FR-INS-*, FR-HAND-* |
 | 4c Quota | alongside P1 | Redis per-key / per-number quota | FR-GW-08b |
@@ -487,10 +526,7 @@ LLM output, `BadRequest` (400) for input validation.
 | FR-ACC-02 | C | Minimal paid access | A paid user can be marked in the database and gets a higher limit; payment can be manual at first |
 | FR-INS-01 | M | Log every unanswered or low-confidence question | Stored with `requestId`, timestamp, retrieval mode; listable via an admin endpoint |
 | FR-HAND-01 | S | Human handoff | On repeated failures or an explicit request, notify the owner and stop auto-replying to that chat |
-| FR-EVAL-01 | M | Golden question set | 20–30 questions, including exact-term and no-answer cases, built from real student/parent questions |
-| FR-EVAL-02 | M | Evaluation runner | Reports retrieval hit rate, answer support, latency and cost per question; results saved per run |
-| FR-SAFE-01 | M | Prompt-injection tests | Instructions inside an uploaded document do not change behavior; tests pass in CI |
-| FR-SAFE-02 | M | Unsupported-answer tests | Questions outside the documents return the exact "I don't know" reply |
+| FR-EVAL / FR-SAFE | M | Evaluation and safety pipeline | Defined in §7.10; for this track the golden set must include real student questions and Hindi/Hinglish cases |
 
 ### 15.4 Non-functional requirements
 | ID | Requirement |

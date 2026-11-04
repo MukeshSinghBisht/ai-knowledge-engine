@@ -5,6 +5,8 @@
 
 This roadmap combines the existing AI Gateway plan with the newer evaluation, observability, orchestration, MCP, safety, and job-market recommendations. It targets applied AI / LLM application engineering, not ML research. Core job-search work remains the priority; use the existing job-search/GitHub time block for these sessions.
 
+> **Update 2026-11-04:** the evaluation and MCP items now follow [plan-evals-and-mcp.md](./plan-evals-and-mcp.md); the earlier dates in this file for those items have slipped.
+
 ## Current Status
 
 Status meanings: **Done** = present and demonstrable in the repository; **Partial** = some relevant implementation exists, but the planned outcome is incomplete; **Not started** = no implementation or evidence found in the workspace as of 2026-10-01.
